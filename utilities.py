@@ -61,7 +61,7 @@ def createIDDict(targetdict, keytype, classtype, pathsrc = None):
 
 def associateImageID(src):
 
-    imgs = sorted(glob(src + "masks/**/*"))
+    imgs = sorted(glob(src + "images/**/*"))
 
     imgNames = [i.split("/")[-1] for i in imgs]
 

@@ -24,7 +24,7 @@ def getImageInfo(src):
 
     idDict = json.load(open(src + "imgDict.json"))
 
-    imgs = sorted(glob(src + "masks/**/*"))
+    imgs = sorted(glob(src + "images/**/*"))
 
     imgsInfo = []
 

@@ -55,9 +55,8 @@ def getSegmentation(img):
     # raw position info
     pixels = np.where(imgGray != 0)
 
-
-    border = []
     # get the top of the image (left to right)
+    border = []
     for i in range(imgGray.shape[0]):
         pos = np.where((imgGray[i, :])==255)[0]
         if len(pos) > 0:
@@ -70,7 +69,6 @@ def getSegmentation(img):
         if len(pos) > 0:
             border.append(min(pos))
             border.append(i)
-
 
     # formatted for the segment info
     segment = str([border])
@@ -135,7 +133,7 @@ def getAnnotationInfo(src):
         mask = cv2.imread(m)
         _, segment, area, bbox, _ = getAnnotations(mask)
         annoDict = {}
-        annoDict["segmentation"] = segment
+        annoDict["segmentation"] = ""
         annoDict["area"] = area
         annoDict["iscrowd"] = 0                       # always individual fish
         annoDict["image_id"]= idDict.get(imgName)                      # there is only one segmentation per image so the id is the same as the image
