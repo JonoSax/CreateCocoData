@@ -5,7 +5,8 @@ import cv2
 from multiprocessing import Process
 import multiprocessing
 import os
-from utilities import createIDDict
+from cocoDataStructure.utilities import createIDDict
+from random import shuffle
 
 def drawLine(img, point0, point1, blur = 2, colour = [0, 0, 255]):
 
@@ -73,6 +74,9 @@ def annotateSegments(src, random = True):
     annotations = segments["annotations"]
     images = segments["images"]
     categories = segments["categories"]
+    
+    if random:
+        shuffle(annotations)
 
     # downloadImages(imgsrc, images, limit = 10)
     imgDict = createIDDict(images, "id", "file_name")
@@ -132,4 +136,4 @@ def annotateSegments(src, random = True):
 if __name__ == "__main__":
 
     segsrc = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/testCoco.json"
-    annotateSegments(segsrc, random = 10)
+    annotateSegments(segsrc, random = 100)
