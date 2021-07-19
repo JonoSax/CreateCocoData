@@ -8,7 +8,7 @@ from downloadCocoData import printProgressBar
 import os
 import albumentations as A
 import shutil
-from torch.utils.data import Dataset
+# from torch.utils.data import Dataset
 
 '''
 This is creating synthetic data based on foreground and background images.
@@ -319,7 +319,6 @@ class augmentImageTF():
             imgs["img"] *= ((imgs["mask"] > 127)*1).astype(np.uint8)
 
         return(imgs)
-
 class augmentImageAL(Dataset):
     def __init__(self, images_filepaths, mask_filespaths = None, transform=None):
         self.images_filepaths = images_filepaths
@@ -355,7 +354,6 @@ class augmentImageAL(Dataset):
             image = tranformResult["image"]
 
         return {"img": image, "mask": mask, "name": name}
-
 class createSyntheticImages():
 
     '''
