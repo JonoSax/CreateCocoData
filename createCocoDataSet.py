@@ -1,135 +1,66 @@
 from glob import glob
-import os
 import json
-import cv2
 import numpy as np
-import re
 from random import random
-from downloadCocoData import printProgressBar
+from itertools import repeat
+
+from cocoDataStructure.utilities import printProgressBar
+from cocoDataStructure.categories import getCategoriesInfo
 
 
-def getDataSplit(imgs, masks, split):
+def getDataSplit(src, split = [0.8, 0.1, 0.1]):
 
     '''
     From the images and segmentation masks, create a training data and 
     validation data split
     '''
 
-    imgs = sorted(imgs)
-    masks = sorted(masks)
+    print("Running getDataSplit")
 
-    trainImg = []
-    trainMask = []
-    valImg = []
-    valMask = []
-    for i, m in zip(imgs, masks):
-        if random() < split:
-            trainImg.append(i)
-            trainMask.append(m)
+    # get the split 
+    train, val, test = split
+
+    if train+val+test < 1:
+        test = 1 - (train + val)
+
+    # if the sum is greater than 1 then normalize
+    if train+val+test > 1:
+        splitSum = train+val+test
+        train /= splitSum
+        val /= splitSum
+        test /= splitSum
+
+    cocoAll = json.load(open(src + "cocoAll.json", "r"))
+
+    trainCoco = cocoAll.copy(); trainCoco["images"] = []
+    valCoco = cocoAll.copy(); valCoco["images"] = []
+    testCoco = cocoAll.copy(); testCoco["images"] = []
+
+    imgs = cocoAll["images"]
+
+    for i in imgs:
+        r = random() 
+        if r < train:
+            trainCoco['images'].append(i)
+        elif r < train + val:
+            valCoco['images'].append(i)
         else:
-            valImg.append(i)
-            valMask.append(m)
+            testCoco['images'].append(i)
 
-    return(trainImg, trainMask, valImg, valMask)
+    json.dump(trainCoco, open(src + "trainCoco.json", "w"))
+    json.dump(valCoco, open(src + "valCoco.json", "w"))
+    json.dump(testCoco, open(src + "testCoco.json", "w"))
 
-def getAnnotationInfo(img):
-
-    '''
-    Gets all the mask info for the annotaiton
-    '''
-
-    dims = getDims(img)
-    pixels, segment = getSegmentation(img)
-    bbox = getBoundingBox(pixels)
-    area = getArea(pixels)
-
-    return(pixels, segment, area, bbox, dims)
-
-def getDims(img):
-
-    '''
-    Get the image dimensions
-    '''
-
-    x, y, _ = img.shape
-
-    return(x, y)
-
-def getSegmentation(img):
-
-    '''
-    Get the list of points which make up the segmentation mask
-    '''
-
-    # count all the non-zero pixel positions as the mask
-    imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # raw position info
-    pixels = np.where(imgGray != 0)
+    print("Finished getDataSplit")
 
 
-    border = []
-    # get the top of the image (left to right)
-    for i in range(imgGray.shape[0]):
-        pos = np.where((imgGray[i, :])==255)[0]
-        if len(pos) > 0:
-            border.append(max(pos))
-            border.append(i)
-
-    # get the bottom of the image (right to left)
-    for i in range(imgGray.shape[0]-1, -1, -1):
-        pos = np.where((imgGray[i, :])==255)[0]
-        if len(pos) > 0:
-            border.append(min(pos))
-            border.append(i)
-
-
-    # formatted for the segment info
-    segment = str([border])
-
-    return(pixels, segment)
-
-def getBoundingBox(pixel):
-
-    '''
-    Get the bounding box of an images segmentation mask
-    (topLeft_X, topLeft_Y, width, height)
-    '''
-
-    topL_y, topL_x = np.min(pixel, axis = 1)
-    botR_y, botR_x = np.max(pixel, axis = 1)
-
-    width = botR_x - topL_x
-    height = botR_y - topL_y
-
-    return(str([topL_x, topL_y, width, height]))
-
-def getArea(pixel):
-
-    '''
-    Get the number of pixels within an images segmentation mask
-    '''
-
-    posCount = len(pixel[0])
-
-    return(posCount)
-
-def processCoco(cocoInfo):
-
-    '''
-    To get the coco structure correct some processing is required...
-    '''
-
-    # remove string inserts
-    cocoInfoNew = cocoInfo[0].replace('"[', '[').replace(']"', ']')
-
-    return(cocoInfoNew)
-
-def createCocoData(masks, imgs, dest):
+def createCocoData(src):
 
     '''    
     create the master dictionary to put all info
     '''
+
+    print("Running createCocoData")
 
     cocoInfo = {
         "info":{},
@@ -140,114 +71,50 @@ def createCocoData(masks, imgs, dest):
     }
 
     # create info and assign to master dict
-    info = {
+    cocoInfo["info"] = {
         "description": "Fish dataset",
-        "url": "https://groups.inf.ed.ac.uk/f4k/GROUNDTRUTH/",
+        "url": ["https://groups.inf.ed.ac.uk/f4k/GROUNDTRUTH/", 
+        "https://www.kaggle.com/sripaadsrinivasan/fish-species-image-data", 
+        "https://www.kaggle.com/crowww/a-large-scale-fish-dataset"],
         "version": "1.0",
-        "year": 2013,
-        "contributor": "Fish4Knowledge, organised by Jonathan Reshef",
+        "year": 2021,
+        "contributor": "Jonathan Reshef",
         "date_created": "2021/06/10"
     }
 
-    # create the classes and assign to master dict
-    categories = [
-        # fish
-        {
-            "id": 1,
-            "name": "fish",
-            "supercategory": "creatures"
-        }
-    ]
-    '''
-    # dock
-    {
-        "supercategory": "structure",
-        "id": 1, 
-        "name": "dock"
-    }
-    '''
+    cocoInfo["categories"] = json.load(open(src + "categories.json"))
 
-    # create per image info 
-    images = []
-    annotations = []
-    for id, (m, i) in enumerate(zip(masks, imgs)):
-        
-        printProgressBar(id, len(masks) - 1, f"Annos made for {dest.split('/')[-1]}", length = 10)
+    imgInfoAll = []
+    imgJson = sorted(glob(src + "*/images.json"))
+    lastID = 0          # ensure the ids are uniquely assigned
+    for i in imgJson:
+        imgInfo = json.load(open(i))
+        [exec(f'i["id"] += {lastID}') for i in imgInfo]       # adjust the ID's
+        lastID = imgInfo[-1]["id"]
+        imgInfoAll += imgInfo
 
-        # get informaiton from the mask
-        img = cv2.imread(i)
-        mask = cv2.imread(m)
+    cocoInfo["images"] = imgInfoAll
 
-        # NOTE be careful about the x and y positions of the bbox and pixels.... 
-        pixels, segment, area, bbox, dims = getAnnotationInfo(mask)
-        imgm = (img.astype(float)*0.1).astype(np.uint8)
-        pix = np.c_[pixels]
-        for p in pix:
-            imgm[p[0], p[1]] *= 10
+    annotationInfoAll = []
+    annosJson = sorted(glob(src + "*/annotations.json"))
+    lastImgID = 0          # ensure the image ids are uniquely assigned
+    lastObjID = 0       # ensure the annotation id's are uniquely assigned
+    for a in annosJson:
+        annosInfo = json.load(open(a))
+        [exec(f'i["image_id"] += {lastImgID}') for i in annosInfo] 
+        [exec(f'i["id"] += {lastObjID}') for i in annosInfo] 
+        [exec(f'i["bbox"] = [int(ib) for ib in i["bbox"].split(",")]') for i in annosInfo] 
+        [exec(f'i["segmentation"] = []') for i in annosInfo] 
+        lastImgID = annosInfo[-1]["image_id"]
+        lastObjID = annosInfo[-1]["id"]
+        annotationInfoAll += annosInfo
 
-        # y0, x0, y1, x1 = np.array(bbox.replace("[", "").replace("]", "").replace(" ", "").split(",")).astype(int)
-        # cv2.rectangle(imgm, [x0, y0], [x0+x1, y0+y1], [0, 0, 255], 2)
+    cocoInfo["annotations"] = annotationInfoAll
 
-        annotation = {}
-        annotation["segmentation"] = segment
-        annotation["area"] = area
-        annotation["iscrowd"] = 0                       # always individual fish
-        annotation["image_id"]= id                      # there is only one segmentation per image so the id is the same as the image
-        annotation["bbox"] = bbox
-        annotation["category_id"] = 1                   # always fish category
-        annotation["id"] = id                           # iterate through unique images
+    json.dump(cocoInfo, open(src + "cocoAll.json", "w"), indent=4)
 
-        annotations.append(annotation)
+    print("Finished createCocoData")
 
-        '''
-        id – (Not required) The identifier for the annotation.
-        image_id – (Required) Corresponds to the image id in the images array.
-        category_id – (Required) The identifier for the label that identifies the object within a bounding box. It maps to the id field of the categories array.
-        iscrowd – (Not required) Specifies if the image contains a crowd of objects.
-        segmentation – (Not required) Segmentation information for objects on an image. Amazon Rekognition Custom Labels doesn't support segmentation.
-        area – (Not required) The area of the annotation.
-        bbox – (Required) Contains the coordinates, in pixels, of a bounding box around an object on the image.
-        '''
-        image = {}
-        image["id"] = id                                # only one annotation per image
-        image["height"], image["width"] = dims
-        image["file_name"] = i.split("/")[-1]           # only the name, no path
-        image["date_captured"] = "null"                 # no info on data
-
-        images.append(image)
-
-        '''
-        id – (Required) A unique identifier for the image. The id field maps to the id field in the annotations array (where bounding box information is stored).
-        license – (Not Required) Maps to the license array.
-        coco_url – (Optional) The location of the image.
-        flickr_url – (Not required) The location of the image on Flickr.
-        width – (Required) The width of the image.
-        height – (Required) The height of the image.
-        file_name – (Required) The image file name. In this example, file_name and id match, but this is not a requirement for COCO datasets.
-        date_captured –(Required) the date and time the image was captured.
-        '''
-
-
-    # assign all created info
-    cocoInfo["info"] = info
-    cocoInfo["categories"] = categories
-    cocoInfo["images"] = images
-    cocoInfo["annotations"] = annotations
-    cocoInfo["licenses"] = []
-
-    cocoDraftPath = f"{dest}_DRAFT.json"; cocoDraftFile = open(cocoDraftPath, "w")
-    json.dump(cocoInfo, cocoDraftFile); cocoDraftFile.close()
-
-    cocoInfoDraft = open(cocoDraftPath)
-    cocoFinalPath = f"{dest}.json"; cocoFinalFile = open(cocoFinalPath, "w")
-    
-    cocoInfoJson = cocoInfoDraft.readlines()
-    cocoFinalInfo = processCoco(cocoInfoJson)
-
-    # MAKE THIS SAVE
-    cocoFinalFile.write(cocoFinalInfo); cocoFinalFile.close()
-    
-    print(f"json file for {dest} complete")
 
 def combineCocoData(dataPath, dest):
 
@@ -269,30 +136,9 @@ def combineCocoData(dataPath, dest):
 
 if __name__ == "__main__":
 
-    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/instance/Fish4Knowledge/"
+    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/"
 
+    # categoryInfo = getCategoriesInfo(src)
+    createCocoData(src)
 
-    # load all segmentation masks
-    masksrc = "data/datasources/testdataset/mask/"
-    masksrc = "/Volumes/USB/segmentationData/instance/Fish4Knowledge/testdataset2/mask/"
-    masksrc = "/Volumes/USB/segmentationData/dataGenerator/foregrounds/modImages/mask/"
-    masksrc = src + "mask_image_all/"
-    masks = glob(masksrc + "*png")
-    
-    imgsrc = "data/datasources/testdataset/fish/"
-    imgsrc = "/Volumes/USB/segmentationData/instance/Fish4Knowledge/testdataset2/fish/"
-        
-    imgsrc = "/Volumes/USB/segmentationData/instance/Fish4Knowledge/testdataset2/fish/"
-    imgsrc = "/Volumes/USB/segmentationData/dataGenerator/foregrounds/modImages/img/"
-    imgsrc = "data/datasources/testdataset/fish/"
-    imgsrc = src + "fish_image_all/"
-    imgs = glob(imgsrc + "*png")
-
-    trainImg, trainMask, valImg, valMask = getDataSplit(imgs, masks, 0.8)
-
-    createCocoData(valMask, valImg, f"{imgsrc}val")
-    # createCocoData(trainMask, trainImg, f"{imgsrc}train")
-    
-    cocosrc = ["data/datasources/testdataset/cocoInfo_Train.json", "data/datasources/testdataset/cocoInfo_Val.json"]
-
-    combineCocoData(cocosrc, "data/datasources/testdataset/cocoInfo_Combined.json")
+    getDataSplit(src)
