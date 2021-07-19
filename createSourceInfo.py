@@ -3,21 +3,29 @@ For a given data source, create the image, annotation and
 categories info
 '''
 
-from images import getImageInfo
-from annotations import getAnnotationInfo
-from categories import getCategoriesInfo
-from utilities import *
+from cocoDataStructure.images import getImageInfo
+from cocoDataStructure.annotations import getAnnotationInfo
+from cocoDataStructure.categories import getCategoriesInfo
+from cocoDataStructure.utilities import *
 
 import json
 from glob import glob
 from itertools import repeat
+import os
 
 if __name__ == "__main__":
 
-    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Ulucan/"
+    srcs = ["/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Ulucan/",
+    "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Fish4Knowledge/"]
 
-    imgDict = associateImageID(src)
+    srcs = ["/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/QUT/"]
 
-    categoryInfo = getCategoriesInfo(src)
-    imageInfo = getImageInfo(src)
-    annotationInfo = getAnnotationInfo(src)
+    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/"
+
+    # srcs = glob(src + "*")
+
+    for src in srcs:
+        if os.path.isdir(src):
+            imgDict = associateImageID(src)
+            imageInfo = getImageInfo(src)
+            annotationInfo = getAnnotationInfo(src)
