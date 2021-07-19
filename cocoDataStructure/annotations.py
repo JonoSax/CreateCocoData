@@ -16,6 +16,7 @@ from glob import glob
 import cv2
 from utilities import *
 import json
+import os
 
 def getAnnotations(img):
 
@@ -112,10 +113,15 @@ def processCoco(cocoInfo):
 
     return(cocoInfoNew)
 
-def getAnnotationInfo(src):
+def getMaskInfo(src): 
+
+    '''
+    If there are masks then process that info
+    '''
+
+    annotationInfo = []
 
     masks = sorted(glob(src + "masks/**/*"))
-    annotationInfo = []
 
     idDict = json.load(open(src + "imgDict.json"))
     classDict = json.load(open(src + "classDict.json"))
@@ -129,7 +135,7 @@ def getAnnotationInfo(src):
         if classDict.get(imgClass) is None:
             continue
         
-        printProgressBar(n, len(masks) - 1, prefix = 'AnnotationInfo:', suffix = 'Complete', length=15)
+        printProgressBar(n, len(masks) - 1, prefix = 'AnnotationInfo:', suffix = '', length=15)
         mask = cv2.imread(m)
         _, segment, area, bbox, _ = getAnnotations(mask)
         annoDict = {}
@@ -142,6 +148,72 @@ def getAnnotationInfo(src):
         annoDict["id"] = n                           # iterate through unique images
         annotationInfo.append(annoDict)
 
+    return(annotationInfo)
+
+def processQUTData(src):
+
+    '''
+    Function to process the QUT data source.
+
+    The QUT data source is super simple. The images are cropped 
+    already so the bounding box is the size of the image
+    '''
+
+    annotationInfo = []
+
+    images = sorted(glob(src + "images/**/*"))
+
+    idDict = json.load(open(src + "imgDict.json"))
+    classDict = json.load(open(src + "classDict.json"))
+
+    for n, i in enumerate(images):
+        imgName = i.split("/")[-1]
+        imgClass = i.split("/")[-2]
+
+        # if the class that is being loaded is not in the dictionary 
+        # then it is being ignored during this data generation 
+        if classDict.get(imgClass) is None:
+            continue
+        
+        printProgressBar(n, len(images) - 1, prefix = 'AnnotationInfo:', suffix = '', length=15)
+        img = cv2.imread(i)
+        x, y, _ = img.shape
+        annoDict = {}
+        annoDict["segmentation"] = ""
+        annoDict["area"] = int(x*y)
+        annoDict["iscrowd"] = 0                       # always individual fish
+        annoDict["image_id"]= idDict.get(imgName)                      # there is only one segmentation per image so the id is the same as the image
+        annoDict["bbox"] = f"0,0,{y},{x}"
+        annoDict["category_id"] = classDict[imgClass]                   # always fish category
+        annoDict["id"] = n                  
+        annotationInfo.append(annoDict)
+
+    return(annotationInfo)
+
+def processOpenImagesData(src):
+
+    '''
+    Function to process the openimages data source
+    '''
+
+    return
+
+def processCocoData(src):
+
+    '''
+    Function to process coco data sources (BrackishWaterImages and Aquarium)
+    '''
+
+    return
+
+def getAnnotationInfo(src):
+
+    # if there are masks then process that info
+    if os.path.isdir(src + "masks/"):
+        annotationInfo = getMaskInfo(src)
+    else:
+        annotationInfo = processQUTData(src)
+
     # save the dictionary as a json file in the src
     json.dump(annotationInfo, open(src + "annotations.json", 'w'))
 
@@ -149,8 +221,6 @@ def getAnnotationInfo(src):
 
 if __name__ == "__main__":
 
-    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Fish4Knowledge/"
+    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/QUT/"
 
     getAnnotationInfo(src)
-
-    pass
