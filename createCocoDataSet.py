@@ -7,6 +7,69 @@ from itertools import repeat
 from cocoDataStructure.utilities import printProgressBar
 from cocoDataStructure.categories import getCategoriesInfo
 
+def createCocoData(src):
+
+    '''    
+    create the master dictionary to put all info
+    '''
+
+    print("Running createCocoData")
+
+    cocoInfo = {
+        "info":{},
+        "licenses":{},
+        "images":{},
+        "annotations":{},
+        "categories":{},
+    }
+
+    # create info and assign to master dict
+    cocoInfo["info"] = {
+        "description": "Fish dataset",
+        "url": ["https://groups.inf.ed.ac.uk/f4k/GROUNDTRUTH/", 
+        "https://www.kaggle.com/sripaadsrinivasan/fish-species-image-data", 
+        "https://www.kaggle.com/crowww/a-large-scale-fish-dataset", 
+        "https://storage.googleapis.com/openimages/web/visualizer/index.html?set=train&type=segmentation&r=false&c=%2Fm%2F0cnyhnx"],
+        "version": "1.0",
+        "year": 2021,
+        "contributor": "Jonathan Reshef",
+        "date_created": "2021/06/10"
+    }
+
+    cocoInfo["categories"] = json.load(open(src + "categories.json"))
+
+    imgInfoAll = []
+    annotationInfoAll = []
+    imgJson = sorted(glob(src + "*/images.json"))
+    annosJson = sorted(glob(src + "*/annotations.json"))
+    print(f'Using: {", ".join([i.split("/")[-2] for i in imgJson])}')
+    lastImgID = 0          # ensure the ids are uniquely assigned
+    lastObjID = 0
+    for i, a in zip(imgJson, annosJson):
+        imgInfo = json.load(open(i))
+        annosInfo = json.load(open(a))
+
+        [exec(f'i["id"] += {lastImgID}') for i in imgInfo]       # adjust the ID's
+        [exec(f'i["image_id"] += {lastImgID}') for i in annosInfo] 
+        [exec(f'i["id"] += {lastObjID}') for i in annosInfo] 
+        [exec(f'i["bbox"] = [int(ib) for ib in i["bbox"].split(",")]') for i in annosInfo] 
+        [exec(f'i["segmentation"] = []') for i in annosInfo] 
+        [exec(f'i["iscrowd"] = int(i["iscrowd"])') for i in annosInfo] 
+
+        lastImgID = np.max([i["id"] for i in imgInfo])
+        lastObjID = np.max([a["id"] for a in annosInfo])
+        
+        imgInfoAll += imgInfo
+        annotationInfoAll += annosInfo
+
+
+    cocoInfo["images"] = imgInfoAll
+    cocoInfo["annotations"] = annotationInfoAll
+
+
+    json.dump(cocoInfo, open(src + "cocoAll.json", "w"), indent=4)
+
+    print("     Finished createCocoData")
 
 def getDataSplit(src, split = [0.8, 0.1, 0.1]):
 
@@ -51,88 +114,7 @@ def getDataSplit(src, split = [0.8, 0.1, 0.1]):
     json.dump(valCoco, open(src + "valCoco.json", "w"))
     json.dump(testCoco, open(src + "testCoco.json", "w"))
 
-    print("Finished getDataSplit")
-
-
-def createCocoData(src):
-
-    '''    
-    create the master dictionary to put all info
-    '''
-
-    print("Running createCocoData")
-
-    cocoInfo = {
-        "info":{},
-        "licenses":{},
-        "images":{},
-        "annotations":{},
-        "categories":{},
-    }
-
-    # create info and assign to master dict
-    cocoInfo["info"] = {
-        "description": "Fish dataset",
-        "url": ["https://groups.inf.ed.ac.uk/f4k/GROUNDTRUTH/", 
-        "https://www.kaggle.com/sripaadsrinivasan/fish-species-image-data", 
-        "https://www.kaggle.com/crowww/a-large-scale-fish-dataset"],
-        "version": "1.0",
-        "year": 2021,
-        "contributor": "Jonathan Reshef",
-        "date_created": "2021/06/10"
-    }
-
-    cocoInfo["categories"] = json.load(open(src + "categories.json"))
-
-    imgInfoAll = []
-    imgJson = sorted(glob(src + "*/images.json"))
-    lastID = 0          # ensure the ids are uniquely assigned
-    for i in imgJson:
-        imgInfo = json.load(open(i))
-        [exec(f'i["id"] += {lastID}') for i in imgInfo]       # adjust the ID's
-        lastID = imgInfo[-1]["id"]
-        imgInfoAll += imgInfo
-
-    cocoInfo["images"] = imgInfoAll
-
-    annotationInfoAll = []
-    annosJson = sorted(glob(src + "*/annotations.json"))
-    lastImgID = 0          # ensure the image ids are uniquely assigned
-    lastObjID = 0       # ensure the annotation id's are uniquely assigned
-    for a in annosJson:
-        annosInfo = json.load(open(a))
-        [exec(f'i["image_id"] += {lastImgID}') for i in annosInfo] 
-        [exec(f'i["id"] += {lastObjID}') for i in annosInfo] 
-        [exec(f'i["bbox"] = [int(ib) for ib in i["bbox"].split(",")]') for i in annosInfo] 
-        [exec(f'i["segmentation"] = []') for i in annosInfo] 
-        lastImgID = annosInfo[-1]["image_id"]
-        lastObjID = annosInfo[-1]["id"]
-        annotationInfoAll += annosInfo
-
-    cocoInfo["annotations"] = annotationInfoAll
-
-    json.dump(cocoInfo, open(src + "cocoAll.json", "w"), indent=4)
-
-    print("Finished createCocoData")
-
-
-def combineCocoData(dataPath, dest):
-
-    '''
-    Take a list of coco annotations and combine them
-
-    dataPath:   list of paths to the coco files to combine
-    dest:       path to where the combined data will be stored
-
-    '''
-    keys = ['info', 'licenses', 'images', 'annotations', 'categories']
-    info = dict.fromkeys(keys, [])
-
-    for d in dataPath:
-        cocoInfo = json.load(open(d))
-        info.update(cocoInfo)
-
-    return
+    print("     Finished getDataSplit")
 
 if __name__ == "__main__":
 
