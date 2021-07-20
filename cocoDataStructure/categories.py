@@ -11,11 +11,9 @@ supercategory
 import numpy as np
 from glob import glob
 import cv2
-from utilities import *
+from cocoDataStructure.utilities import *
 import json
 import os
-
-from utilities import *
 
 def getCategoriesInfo(src):
 
