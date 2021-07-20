@@ -10,13 +10,16 @@ date_captured
 
 '''
 
-from utilities import printProgressBar
+if __name__ == "__main__":
+    from utilities import *
+else:
+    from cocoDataStructure.utilities import *
 import numpy as np
 from glob import glob
 import cv2
 import json
 
-def getImageInfo(src):
+def getImageInfo(src, relative_path=False):
 
     '''
     Populate the image info for a given data source
@@ -33,7 +36,10 @@ def getImageInfo(src):
         printProgressBar(n, len(imgs) - 1, prefix = 'ImageInfo:', suffix = 'Complete', length = 15)
         img = cv2.imread(i)
         imgDict = {}
-        imgDict['file_name'] = i
+        if relative_path:
+            imgDict["file_name"] = "/".join(i.split("/")[-4:])      # images are 4 levels deep in the directory
+        else:
+            imgDict['file_name'] = i
         imgDict['id'] = idDict[imgName]
         imgDict['height'] = img.shape[0]
         imgDict['width'] = img.shape[1]
@@ -49,6 +55,6 @@ if __name__ == "__main__":
 
     src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Fish4Knowledge/"
 
-    getImageInfo(src)
+    getImageInfo(src, True)
 
     pass
