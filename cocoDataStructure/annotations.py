@@ -14,9 +14,13 @@ iscrowd
 import numpy as np
 from glob import glob
 import cv2
-from utilities import *
+if __name__ == "__main__":
+    from utilities import *
+else:
+    from cocoDataStructure.utilities import *
 import json
 import os
+import pandas as pd
 
 def getAnnotations(img):
 
@@ -113,6 +117,33 @@ def processCoco(cocoInfo):
 
     return(cocoInfoNew)
 
+def createAnnotationDict(idDict, classDict, seg, area, crowd, imgName, bbox, imgClass, annoid):
+
+    '''
+    Take in the coco annotation information
+    '''
+
+    imId = idDict.get(imgName)
+    if imId is None:
+        print(f"Invalid Image ID: {imgName}")
+        return(None)
+
+    classId = classDict.get(imgClass)
+    if classId is None:
+        print(f"Invalid Class: {imgClass}")
+        return(None)
+
+    annoDict = {}
+    annoDict["segmentation"] = seg
+    annoDict["area"] = int(area)
+    annoDict["iscrowd"] = int(crowd)                       # always individual fish
+    annoDict["image_id"] = int(imId)                      # there is only one segmentation per image so the id is the same as the image
+    annoDict["bbox"] = bbox
+    annoDict["category_id"] = int(classId)                   # always fish category
+    annoDict["id"] = int(annoid)                           # iterate through unique images
+
+    return(annoDict)
+
 def getMaskInfo(src): 
 
     '''
@@ -138,15 +169,11 @@ def getMaskInfo(src):
         printProgressBar(n, len(masks) - 1, prefix = 'AnnotationInfo:', suffix = '', length=15)
         mask = cv2.imread(m)
         _, segment, area, bbox, _ = getAnnotations(mask)
-        annoDict = {}
-        annoDict["segmentation"] = ""
-        annoDict["area"] = area
-        annoDict["iscrowd"] = 0                       # always individual fish
-        annoDict["image_id"]= idDict.get(imgName)                      # there is only one segmentation per image so the id is the same as the image
-        annoDict["bbox"] = bbox
-        annoDict["category_id"] = classDict[imgClass]                   # always fish category
-        annoDict["id"] = n                           # iterate through unique images
-        annotationInfo.append(annoDict)
+
+        annoDict = createAnnotationDict(idDict, classDict, "", area, 0, imgName, bbox, imgClass, n)
+        
+        if annoDict is not None:
+            annotationInfo.append(annoDict)
 
     return(annotationInfo)
 
@@ -178,15 +205,11 @@ def processQUTData(src):
         printProgressBar(n, len(images) - 1, prefix = 'AnnotationInfo:', suffix = '', length=15)
         img = cv2.imread(i)
         x, y, _ = img.shape
-        annoDict = {}
-        annoDict["segmentation"] = ""
-        annoDict["area"] = int(x*y)
-        annoDict["iscrowd"] = 0                       # always individual fish
-        annoDict["image_id"]= idDict.get(imgName)                      # there is only one segmentation per image so the id is the same as the image
-        annoDict["bbox"] = f"0,0,{y},{x}"
-        annoDict["category_id"] = classDict[imgClass]                   # always fish category
-        annoDict["id"] = n                  
-        annotationInfo.append(annoDict)
+        
+        annoDict = createAnnotationDict(idDict, classDict, "", int(x*y), 0, imgName, f"0,0,{y},{x}", imgClass, n)
+        
+        if annoDict is not None:
+            annotationInfo.append(annoDict)
 
     return(annotationInfo)
 
@@ -196,7 +219,61 @@ def processOpenImagesData(src):
     Function to process the openimages data source
     '''
 
-    return
+    def getInfo(txtsrc, annotationInfo, max = np.inf):
+        for n, i in enumerate(txtsrc):
+            if n == 0:
+                continue
+            if n%100 == 0:
+                print(f"Processing image {n}")
+            if n > max:
+                break
+            # get the info out of the csv
+            ImageID, _, LabelName, _, XMin, XMax, YMin, YMax, _, _, IsGroupOf, _, _, _, _ = i.split(",") 
+
+            label = LabelNameDict[LabelName].lower()
+
+            img = cv2.imread(f"{src}/images/{label}/{ImageID}.jpg")
+            y, x, _ = img.shape
+
+            x0 = int(np.double(XMin)*x)
+            x1 = int(np.double(XMax)*x)
+            y0 = int(np.double(YMin)*y)
+            y1 = int(np.double(YMax)*y)
+
+            bbox = f"{x0},{y0},{x1-x0},{y1-y0}"
+            area = (x1-x0)*(y1-y0)
+
+            annoDict = createAnnotationDict(idDict, classDict, "", area, IsGroupOf, f"{ImageID}.jpg", bbox, label, n)
+        
+            if annoDict is not None:
+                annotationInfo.append(annoDict)
+
+        return(annotationInfo)
+
+    trainInfo = open(src + "sub-train-annotations-bbox.csv")
+    testInfo = open(src + "sub-test-annotations-bbox.csv")
+    valInfo = open(src + "sub-validation-annotations-bbox.csv")
+
+    imgs = glob(src + "images/*/*")
+
+    annotationInfo = []
+
+    classDict = json.load(open(src + "classDict.json"))
+    idDict = json.load(open(src + "imgDict.json"))
+    openImagesDict = open(src + "class-descriptions-boxable.csv")
+    LabelNameDict = {}
+    for o in openImagesDict:
+        k, v = o.split(",")
+        LabelNameDict[k] = v.replace("\n", "")
+
+
+    # read in line by line the csv info because a pandas format is too large
+    # in memory
+    annotationInfo = getInfo(trainInfo, annotationInfo)
+    annotationInfo = getInfo(testInfo, annotationInfo)
+    annotationInfo = getInfo(valInfo, annotationInfo)
+
+    return(annotationInfo)
 
 def processCocoData(src):
 
@@ -212,7 +289,10 @@ def getAnnotationInfo(src):
     if os.path.isdir(src + "masks/"):
         annotationInfo = getMaskInfo(src)
     else:
-        annotationInfo = processQUTData(src)
+        if "qut" in src.lower():
+            annotationInfo = processQUTData(src)
+        elif "openimages" in src.lower():
+            annotationInfo = processOpenImagesData(src)
 
     # save the dictionary as a json file in the src
     json.dump(annotationInfo, open(src + "annotations.json", 'w'))
@@ -221,6 +301,6 @@ def getAnnotationInfo(src):
 
 if __name__ == "__main__":
 
-    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/QUT/"
+    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/openimages/"
 
     getAnnotationInfo(src)
