@@ -16,13 +16,9 @@ import os
 if __name__ == "__main__":
 
     srcs = ["/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Ulucan/",
-    "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Fish4Knowledge/"]
-
-    srcs = ["/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/QUT/"]
-
-    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/"
-
-    # srcs = glob(src + "*")
+    "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Fish4Knowledge/",
+    "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/openimages/",
+    "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/QUT/"]
 
     for src in srcs:
         if os.path.isdir(src):
