@@ -4,6 +4,7 @@ Functions which are used across multiple different scripts
 
 import json
 from glob import glob
+import numpy as np
 
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
     """
@@ -72,4 +73,35 @@ def associateImageID(src):
     json.dump(imgDict, open(src + "imgDict.json", "w"))
 
     return(imgDict)
+
+def drawLine(img, point0, point1, blur = 2, colour = [0, 0, 255]):
+
+    # draw a line between two points
+    # Inputs:   (img), image to draw on
+    #           (point#), the points to draw between, doesn't matter which 
+    #               order they are specified
+    #           (blur), the thickness of the line
+    #           (colour), colour of the line
+    # Outputs:  (img), image with the line drawn
+
+    # get the distance between the points
+    dist = np.ceil(np.sqrt(np.sum(abs(point1 - point0)**2)))
+
+    x, y, _ = img.shape
+
+    # interpolate for the correct number of pixels between points
+    xp = np.clip(np.linspace(int(point0[1]), int(point1[1]), int(dist)).astype(int), 0, x-blur)
+    yp = np.clip(np.linspace(int(point0[0]), int(point1[0]), int(dist)).astype(int), 0, y-blur)
+
+
+    # change the colour of these pixels which indicate the line
+    for vx in range(-blur, blur, 1):
+        for vy in range(-blur, blur, 1):
+            img[xp+vx, yp+vy, :] = colour
+
+    # NOTE this may do the interpolation between the points properly!
+    # pos = np.linspace(point0.astype(int), point1.astype(int), int(dist)).astype(int)
+    
+    
+    return(img)
 
