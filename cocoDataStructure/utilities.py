@@ -105,3 +105,12 @@ def drawLine(img, point0, point1, blur = 2, colour = [0, 0, 255]):
     
     return(img)
 
+def PolyArea(x,y):
+
+    '''
+    Shoe lace formula
+    https://stackoverflow.com/questions/24467972/calculate-area-of-polygon-given-x-y-coordinates
+    '''
+    
+    return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
+            
