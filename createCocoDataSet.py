@@ -46,6 +46,9 @@ def createCocoData(src):
     lastImgID = 0          # ensure the ids are uniquely assigned
     lastObjID = 0
     for i, a in zip(imgJson, annosJson):
+
+        print(f'Processing {i.split("/")[-2]}')
+
         imgInfo = json.load(open(i))
         annosInfo = json.load(open(a))
 
@@ -53,7 +56,13 @@ def createCocoData(src):
         [exec(f'i["image_id"] += {lastImgID}') for i in annosInfo] 
         [exec(f'i["id"] += {lastObjID}') for i in annosInfo] 
         [exec(f'i["bbox"] = [int(ib) for ib in i["bbox"].split(",")]') for i in annosInfo] 
-        [exec(f'i["segmentation"] = []') for i in annosInfo] 
+        try:
+            # if there are segmentations
+            [exec(f'i["segmentation"] = [[int(ib) for ib in i["segmentation"].split(",")]]') for i in annosInfo] 
+        except:
+            # if there are no segmentations
+            [exec(f'i["segmentation"] = []') for i in annosInfo] 
+
         [exec(f'i["iscrowd"] = int(i["iscrowd"])') for i in annosInfo] 
 
         lastImgID = np.max([i["id"] for i in imgInfo])
@@ -119,6 +128,7 @@ def getDataSplit(src, split = [0.8, 0.1, 0.1]):
 if __name__ == "__main__":
 
     src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/"
+    src = "/Volumes/WorkStorage/BoxFish/dataStore/Aruco+Net/"
 
     # categoryInfo = getCategoriesInfo(src)
     createCocoData(src)
