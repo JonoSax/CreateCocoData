@@ -21,6 +21,8 @@ else:
 import json
 import os
 import pandas as pd
+import cv2
+import cv2.aruco as aruco
 
 def getAnnotations(img):
 
@@ -283,6 +285,70 @@ def processCocoData(src):
 
     return
 
+def processArucoMarkers(src):
+
+    '''
+    Segment the aruco markers and create their masks
+    '''
+
+    images = sorted(glob(src + "images/**/*"))
+
+    arucoDict = aruco.getPredefinedDictionary(aruco.DICT_ARUCO_ORIGINAL)
+
+    idDict = json.load(open(src + "imgDict.json"))
+
+    classDict = json.load(open(src + "classDict.json"))
+
+    annotationInfo = []                
+
+    annoid = 0
+
+    for n, i in enumerate(images):
+
+        printProgressBar(n, len(images)-1, "Images", length = 20)
+
+        img = cv2.imread(i)
+
+        imgName = i.split("/")[-1]        
+        imgClass = i.split("/")[-2] 
+
+        # create arcuo marker parameters
+        param = aruco.DetectorParameters_create()
+
+        # on my mac, takes 5.4 sec to run through the 216 images in blue_aruco_dataSmall
+        param.minDistanceToBorder = 0               # allows for markers to be identified at the edge of the frame      -0.1sec overhead (makes it faster)  
+        param.adaptiveThreshWinSizeStep = 4         # good compromise bewteen true positive and speed,                  1.7sec overhead
+        param.adaptiveThreshWinSizeMax = 70         # good compromise between true positive and speed,                  1.8sec overhead
+        param.adaptiveThreshConstant = 4            # good compromise between true positive and speed,                  1.0sec overhead
+        param.polygonalApproxAccuracyRate = 0.09    # most accurate parameter, speed is very stable across variables,   0.9sec overhead
+        param.perspectiveRemovePixelPerCell = 8     # fastest speed without compromising accuracy,                      -0.1sec overhead
+    
+        # detect markers
+        corners, ids, _ = aruco.detectMarkers(img, arucoDict, parameters = param)
+
+        if corners is not None:
+
+            for c in corners:
+                c = c[0].astype(int)
+                seg = str(list(np.hstack(c))).replace("[", "").replace("]", "")          # get the boundaries of the box (just the corners???)
+                area = PolyArea(c[:, 0], c[:, 1])        # trapizoid calculation?
+                
+                yMi, xMi = np.min(c, axis = 0)
+                yMa, xMa = np.max(c, axis = 0)
+
+                bbox = f"{yMi},{xMi},{yMa-yMi},{xMa-xMi}"            # is this the same as seg?
+
+                annoDict = createAnnotationDict(idDict, classDict, seg, area, 0, imgName, bbox, imgClass, annoid)
+                
+                if annoDict is not None:
+                    annotationInfo.append(annoDict)
+                    annoid += 1
+                    
+            # imgmod = aruco.drawDetectedMarkers(img.copy(), corners, ids, [0, 0, 255])
+            # cv2.imshow(f"imgmod", imgmod); cv2.waitKey(0)
+
+    return(annotationInfo)
+
 def getAnnotationInfo(src):
 
     # if there are masks then process that info
@@ -293,6 +359,9 @@ def getAnnotationInfo(src):
             annotationInfo = processQUTData(src)
         elif "openimages" in src.lower():
             annotationInfo = processOpenImagesData(src)
+        elif "aruco" in src.lower():
+            annotationInfo = processArucoMarkers(src)
+
 
     # save the dictionary as a json file in the src
     json.dump(annotationInfo, open(src + "annotations.json", 'w'))
@@ -301,6 +370,6 @@ def getAnnotationInfo(src):
 
 if __name__ == "__main__":
 
-    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/openimages/"
+    src = "/Volumes/WorkStorage/BoxFish/dataStore/Aruco+Net/net_day_shade_pool/"
 
     getAnnotationInfo(src)
