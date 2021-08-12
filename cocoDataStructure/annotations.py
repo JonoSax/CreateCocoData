@@ -146,7 +146,7 @@ def createAnnotationDict(idDict, classDict, seg, area, crowd, imgName, bbox, img
 
     return(annoDict)
 
-def getMaskInfo(src): 
+def getMaskInfo(src, segData = False): 
 
     '''
     If there are masks then process that info
@@ -167,19 +167,27 @@ def getMaskInfo(src):
         # then it is being ignored during this data generation 
         if classDict.get(imgClass) is None:
             continue
+
+        if (n/len(masks)*100) % 10 == 0:
+            print(f"getAnnotationInfo:{src.split('/')[-2]} - {n}/{len(masks)}")
+
+        # printProgressBar(n, len(masks) - 1, prefix = 'AnnotationInfo:', suffix = '', length=15)
         
-        printProgressBar(n, len(masks) - 1, prefix = 'AnnotationInfo:', suffix = '', length=15)
         mask = cv2.imread(m)
         _, segment, area, bbox, _ = getAnnotations(mask)
 
-        annoDict = createAnnotationDict(idDict, classDict, "", area, 0, imgName, bbox, imgClass, n)
+        if segData:
+            segment = str(list(np.hstack(np.c_[np.where(mask[:, :, 0])])))[1:-1]
+        else:
+            segment = ""
+        annoDict = createAnnotationDict(idDict, classDict, segment, area, 0, imgName, bbox, imgClass, n)
         
         if annoDict is not None:
             annotationInfo.append(annoDict)
 
     return(annotationInfo)
 
-def processQUTData(src):
+def processQUTData(src, segData = False):
 
     '''
     Function to process the QUT data source.
@@ -204,7 +212,11 @@ def processQUTData(src):
         if classDict.get(imgClass) is None:
             continue
         
-        printProgressBar(n, len(images) - 1, prefix = 'AnnotationInfo:', suffix = '', length=15)
+        if (n/len(images)*100) % 10 == 0:
+            print(f"getAnnotationInfo:{src.split('/')[-2]} - {n}/{len(images)}")
+        
+        # printProgressBar(n, len(images) - 1, prefix = 'AnnotationInfo:', suffix = '', length=15)
+        
         img = cv2.imread(i)
         x, y, _ = img.shape
         
@@ -225,8 +237,6 @@ def processOpenImagesData(src):
         for n, i in enumerate(txtsrc):
             if n == 0:
                 continue
-            if n%100 == 0:
-                print(f"Processing image {n}")
             if n > max:
                 break
             # get the info out of the csv
@@ -285,7 +295,7 @@ def processCocoData(src):
 
     return
 
-def processArucoMarkers(src):
+def processArucoMarkers(src, segData = False):
 
     '''
     Segment the aruco markers and create their masks
@@ -304,8 +314,10 @@ def processArucoMarkers(src):
     annoid = 0
 
     for n, i in enumerate(images):
-
-        printProgressBar(n, len(images)-1, "Images", length = 20)
+        if (n/len(images)*100) % 10 == 0:
+            print(f"getAnnotationInfo:{src.split('/')[-2]} - {n}/{len(images)}")
+        
+        # printProgressBar(n, len(images)-1, "getAnnotationInfo", length = 20)
 
         img = cv2.imread(i)
 
@@ -330,13 +342,17 @@ def processArucoMarkers(src):
 
             for c in corners:
                 c = c[0].astype(int)
-                seg = str(list(np.hstack(c))).replace("[", "").replace("]", "")          # get the boundaries of the box (just the corners???)
                 area = PolyArea(c[:, 0], c[:, 1])        # trapizoid calculation?
                 
                 yMi, xMi = np.min(c, axis = 0)
                 yMa, xMa = np.max(c, axis = 0)
 
                 bbox = f"{yMi},{xMi},{yMa-yMi},{xMa-xMi}"            # is this the same as seg?
+
+                if segData:
+                    seg = str(list(np.hstack(c))).replace("[", "").replace("]", "")          # get the boundaries of the box (just the corners???)
+                else:
+                    seg = ""
 
                 annoDict = createAnnotationDict(idDict, classDict, seg, area, 0, imgName, bbox, imgClass, annoid)
                 
@@ -371,5 +387,6 @@ def getAnnotationInfo(src):
 if __name__ == "__main__":
 
     src = "/Volumes/WorkStorage/BoxFish/dataStore/Aruco+Net/net_day_shade_pool/"
-
-    getAnnotationInfo(src)
+    src = "/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/mod/"
+    src = "/Volumes/USB/data/YOLO_data/YOLO_data/Ulucan/"
+    getAnnotationInfo(src)  
