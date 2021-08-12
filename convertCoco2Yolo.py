@@ -3,9 +3,10 @@ Take the coco structure and convert it to yolo structure
 '''
 
 import json
+import multiprocessing
 import os
 from cocoDataStructure.utilities import createIDDict, dirMaker, printProgressBar
-from multiprocessing import Pool
+from multiprocessing import Pool, Process
 from itertools import repeat
 from random import shuffle
 from overlaySegment import annotateYoloSegments
@@ -52,7 +53,7 @@ def createYoloData(src, dest):
     dirMaker(labelDest, True)
     dirMaker(imgDest, True)
 
-    images = cocoData["images"][35000:]
+    images = cocoData["images"]
     # shuffle(images)
     images = images[:100]
     annos = cocoData["annotations"]
@@ -60,8 +61,13 @@ def createYoloData(src, dest):
     # create the dictionary which relates the image ids to their anno ids
     annoIds = createIDDict(annos, "image_id", "*")
 
-    with Pool(4) as p:
-        p.starmap(convertData, zip(images, repeat(annos), repeat(annoIds), repeat(labelDest), repeat(imgDest)))
+    job = []
+    for n, i in enumerate(images):
+        job.append(Process(target=convertData, args=(i, annos, annoIds, labelDest, imgDest)))
+        job[n].start()
+    for n, j in enumerate(job):
+        j.join()
+        printProgressBar(n, len(images) - 1, "Converted: ", length = 20)
 
 def convertData(i, annos, annoIds, labelDest, imgDest):
 
@@ -98,6 +104,8 @@ def convertData(i, annos, annoIds, labelDest, imgDest):
 
 
 if __name__ == "__main__":
+
+    multiprocessing.set_start_method("fork")
 
     srcs = ["/Volumes/USB/data/CocoData/train.json",
     "/Volumes/USB/data/CocoData/val.json"]
