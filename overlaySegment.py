@@ -1,3 +1,7 @@
+'''
+Visualise the coco data sets
+'''
+
 import numpy as np
 from glob import glob 
 import json
@@ -29,7 +33,7 @@ def getSegPos(seg):
 
     return(pix)
 
-def annotateSegments(src, random = True):
+def annotateCocoSegments(src, random = True):
 
     '''
     Load in the coco information and annotate the segments
@@ -83,7 +87,7 @@ def annotateSegments(src, random = True):
             # imgm = (imgm.astype(float)*0.2).astype(np.uint8)
             for s in a["segmentation"]:
                 pix = getSegPos(s)
-                '''
+                
                 for p in pix:
                     imgm[p[0], p[1]] = [0, 0, 255]
                 '''
@@ -93,6 +97,7 @@ def annotateSegments(src, random = True):
                         imgm = drawLine(imgm, p0, p1)
                     except:
                         pass
+                '''
 
             # draw the bounding box
             x0, y0, x1, y1 = a["bbox"]
@@ -115,7 +120,72 @@ def annotateSegments(src, random = True):
         # y0, x0, y1, x1 = np.array(bbox.replace("[", "").replace("]", "").replace(" ", "").split(",")).astype(int)
         # cv2.rectangle(imgm, [x0, y0], [x0+x1, y0+y1], [0, 0, 255], 2)
 
+def annotateYoloSegments(src, random = True):
+
+    '''
+    Load in the YOLO information and annotate the segments
+
+    Inputs   
+    src:        the yolo file containing the image and segment info
+    random      if set to a value then will randomally n number of annotations
+
+    '''
+    # src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Aquarium/test/"
+    # jsonsrc = src+"_annotations.coco.json"
+
+    annos = sorted(glob(src+"labels/*/*.txt"))
+    images = sorted(glob(src+"images/*/*.*"))
+
+    if random:
+        ids = np.arange(len(images))
+        np.random.shuffle(ids)
+        annos = [annos[i] for i in ids]
+        images = [images[i] for i in ids]
+
+    for n, (i, a) in enumerate(zip(images, annos)):
+
+        img = cv2.imread(i)
+        y, x, _ = img.shape
+        imgm = img.copy()
+
+        annos = open(a, "r").readlines()
+
+        for anno in annos:
+
+            anno = anno.replace("\n", "")
+            id, xC, yC, w, h = anno.split(" ")
+
+            print(f"ID = {id}")
+
+            # get the corners of the bounding box
+            x0 = int((float(xC) - float(w)/2) * x)
+            y0 = int((float(yC) - float(h)/2) * y)
+            x1 = int((float(xC) + float(w)/2) * x)
+            y1 = int((float(yC) + float(h)/2) * y)
+
+            # draw the bounding box
+            imgm = drawLine(imgm, np.array([x0, y0]), np.array([x1, y0]))
+            imgm = drawLine(imgm, np.array([x0, y0]), np.array([x0, y1]))
+            imgm = drawLine(imgm, np.array([x1, y1]), np.array([x1, y0]))
+            imgm = drawLine(imgm, np.array([x1, y1]), np.array([x0, y1]))
+            
+            xp = int(np.median([x0, x1]))
+            yp = int(np.median([y0, y1]))
+            
+        imgC = np.hstack([img, imgm])
+        cv2.imshow("img", imgC); cv2.waitKey(0)
+
+        # y0, x0, y1, x1 = np.array(bbox.replace("[", "").replace("]", "").replace(" ", "").split(",")).astype(int)
+        # cv2.rectangle(imgm, [x0, y0], [x0+x1, y0+y1], [0, 0, 255], 2)
+
+
 if __name__ == "__main__":
 
-    segsrc = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/cocoAll.json"
-    annotateSegments(segsrc, random = 500)
+    cocosrc = "/Volumes/WorkStorage/BoxFish/dataStore/Aruco+Net/cocoAll.json"
+    cocosrc = "/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/cocoAll.json"
+    cocosrc = "/Volumes/USB/data/YOLO_data/YOLO_data/cocoAll.json"
+    yolosrc = "/Volumes/USB/data/coco128/"
+    yolosrc = "/Volumes/USB/data/YoloData/"
+
+    annotateYoloSegments(yolosrc, False)
+    annotateCocoSegments(cocosrc)
