@@ -5,6 +5,8 @@ Functions which are used across multiple different scripts
 import json
 from glob import glob
 import numpy as np
+import shutil
+import os
 
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
     """
@@ -62,6 +64,8 @@ def createIDDict(targetdict, keytype, classtype, pathsrc = None):
 
 def associateImageID(src):
 
+    print(f"Associating {src.split('/')[-2]} id")
+
     imgs = sorted(glob(src + "images/**/*"))
 
     imgNames = [i.split("/")[-1] for i in imgs]
@@ -71,6 +75,8 @@ def associateImageID(src):
         imgDict[i] = n
 
     json.dump(imgDict, open(src + "imgDict.json", "w"))
+
+    print(f"    Finished {src.split('/')[-2]}")
 
     return(imgDict)
 
@@ -114,3 +120,41 @@ def PolyArea(x,y):
     
     return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
             
+def dirMaker(dir, remove = False):
+
+    '''
+    creates directories (including sub-directories)
+
+    Input:    \n
+    (dir), path to be made
+    (remove), if true, if the directory already exists remove
+
+    Output:   \n
+    (), all sub-directories necessary are created\n
+    (made), boolean whether this is the first time the directory has been made
+    '''
+
+    def make():
+        dirToMake = ""
+        for d in range(dir.count("/")):
+            dirToMake += str(dirSplit[d] + "/")
+            try:
+                os.mkdir(dirToMake)
+                madeNew = True
+            except:
+                madeNew = False
+
+        return(madeNew)
+
+    # ensure that the exact directory being specified exists, if not create it
+    dirSplit = dir.split("/")
+
+    madeNew = make()
+
+    # if the directory exists and the user want to create a clean directory, remove the 
+    # dir and create a new one
+    if madeNew == False and remove == True:
+        shutil.rmtree(dir)
+        madeNew = make()
+    
+    return(madeNew)
