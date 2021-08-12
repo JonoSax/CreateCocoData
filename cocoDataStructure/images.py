@@ -32,8 +32,10 @@ def getImageInfo(src, relative_path=False):
     imgsInfo = []
 
     for n, i in enumerate(imgs):
+        if (n/len(imgs)*100) % 10 == 0:
+            print(f"getImageInfo:{src.split('/')[-2]} - {n}/{len(imgs)}")
         imgName = i.split("/")[-1]
-        printProgressBar(n, len(imgs) - 1, prefix = 'ImageInfo:', suffix = 'Complete', length = 15)
+        # printProgressBar(n, len(imgs) - 1, prefix = f'getImageInfo:{imgName}', suffix = 'Complete', length = 15)
         img = cv2.imread(i)
         imgDict = {}
         if relative_path:
@@ -47,7 +49,8 @@ def getImageInfo(src, relative_path=False):
         imgsInfo.append(imgDict)
 
     # save the dictionary as a json file in the src
-    json.dump(imgsInfo, open(src + "images.json", 'w'))
+    if imgsInfo != []:
+        json.dump(imgsInfo, open(src + "images.json", "w"))
 
     return(imgsInfo)
 
