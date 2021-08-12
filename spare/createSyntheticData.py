@@ -4,11 +4,11 @@ from glob import glob
 from random import uniform, shuffle, random
 from numpy.lib.utils import info
 # import tensorflow as tf
-from downloadCocoData import printProgressBar
+from cocoDataStructure.utilities import printProgressBar, dirMaker
 import os
 import albumentations as A
 import shutil
-# from torch.utils.data import Dataset
+from torch.utils.data import Dataset
 
 '''
 This is creating synthetic data based on foreground and background images.
@@ -320,10 +320,13 @@ class augmentImageTF():
 
         return(imgs)
 class augmentImageAL(Dataset):
-    def __init__(self, images_filepaths, mask_filespaths = None, transform=None):
+
+    def __init__(self, images_filepaths, max_size, min_size, mask_filespaths = None, transform = None,):
         self.images_filepaths = images_filepaths
         self.mask_filespaths = mask_filespaths
         self.transform = transform
+        self.max_size = max_size
+        self.min_size = min_size
 
     def __len__(self):
         return len(self.images_filepaths)
@@ -337,6 +340,17 @@ class augmentImageAL(Dataset):
             mask = cv2.imread(self.mask_filespaths[idx])
         else:
             mask = None
+
+        x, y, _ = image.shape
+
+        # enforce the minimum and maximum image size
+        xn = np.clip(x, self.min_size[0], self.max_size[0])
+        yn = np.clip(y, self.min_size[0], self.max_size[1])
+            
+        if xn != x or yn != y:
+            image = cv2.resize(image, (xn, yn))
+            if mask is not None:
+                mask = cv2.resize(mask, (xn, yn))
 
         # This can be used to identify various image sources
         if os.path.normpath(image_filepath).split(os.sep)[-2] == "Cat":
@@ -353,7 +367,7 @@ class augmentImageAL(Dataset):
 
             image = tranformResult["image"]
 
-        return {"img": image, "mask": mask, "name": name}
+        return {"images": image, "masks": mask, "name": name}
 class createSyntheticImages():
 
     '''
@@ -389,12 +403,16 @@ class createSyntheticImages():
         as determined by the parameters
         '''
 
-        clusters = int(uniform(1, params["clusterNo"]))
+        # if no params provided then use default 
+        if params is None:
+            params = {}
+
+        clusters = int(uniform(1, params.get("clusterNo", 1)))
         backgroundMask = background.copy() * 0
 
         for c in range(clusters):
-            foregroundLoad = self.mod_foreNo(imgs_masks, params["fishNo"])
-            background, backgroundMask = self.mod_clusters(background, foregroundLoad, backgroundMask, params["clusterDensity"])
+            foregroundLoad = self.mod_foreNo(imgs_masks, params.get("fishNo", (1, 1)))
+            background, backgroundMask = self.mod_clusters(background, foregroundLoad, backgroundMask, params.get("clusterDensity", (1, 1)))
 
         return(background, backgroundMask)
 
@@ -404,10 +422,6 @@ class createSyntheticImages():
 
         Each image/mask pair is only used once per function call.
         '''
-
-        # There has to be at least one image captured
-        if param is None:
-            param = 1
 
         fishNo = int(uniform(*param))
         fishID = np.arange(len(imgs_masks))
@@ -467,45 +481,6 @@ class createSyntheticImages():
 
         return(background, backgroundMask)
 
-def dirMaker(dir, remove = False):
-
-    '''
-    creates directories (including sub-directories)
-
-    Input:    \n
-    (dir), path to be made
-    (remove), if true, if the directory already exists remove
-
-    Output:   \n
-    (), all sub-directories necessary are created\n
-    (made), boolean whether this is the first time the directory has been made
-    '''
-
-    def make():
-        dirToMake = ""
-        for d in range(dir.count("/")):
-            dirToMake += str(dirSplit[d] + "/")
-            try:
-                os.mkdir(dirToMake)
-                madeNew = True
-            except:
-                madeNew = False
-
-        return(madeNew)
-
-    # ensure that the exact directory being specified exists, if not create it
-    dirSplit = dir.split("/")
-
-    madeNew = make()
-
-    # if the directory exists and the user want to create a clean directory, remove the 
-    # dir and create a new one
-    if madeNew == False and remove == True:
-        shutil.rmtree(dir)
-        madeNew = make()
-    
-    return(madeNew)
-
 def getMediaTF(mediasources, imgDest, synthNo = None, perSynthNo = 1, frameNo = 30, loadImgs = False, param = None):
 
     '''
@@ -531,8 +506,8 @@ def getMediaTF(mediasources, imgDest, synthNo = None, perSynthNo = 1, frameNo = 
     print(f"\n\nInformation is being created at {imgDest}")
 
     # NOTE have function to create directories
-    imgDestOrig = imgDest + "origImages/"
-    imgDestMod = imgDest + "modImages/"
+    imgDestOrig = imgDest + "orig/"
+    imgDestMod = imgDest + "mod/"
 
     for name in mediasources:
         media = mediasources[name]
@@ -570,8 +545,8 @@ def getMediaAL(mediasources, imgDest, synthNo = None, perSynthNo = 1, frameNo = 
     print(f"\n\nInformation is being created at {imgDest}")
 
     # NOTE have function to create directories
-    imgDestOrig = imgDest + "origImages/"
-    imgDestMod = imgDest + "modImages/"
+    imgDestOrig = imgDest + "orig/"
+    imgDestMod = imgDest + "mod/"
 
     # if loadImgs is True, remove the ENTIRE directory and populate with new data
     if loadImgs:
@@ -685,14 +660,14 @@ def augmentImagesTF(imgsrc, imgdest, synthNo, perSynthNo, params):
                     cv2.imwrite(f"{imgdest}{m}/{name}_{nb}.jpg", modImg[m])
             printProgressBar(nb + n*perSynthNo+1, len(infoAll) * perSynthNo, f"{name} processing", length = 10)
 
-def augmentImagesAL(imgsrc, imgdest, perSynthNo, params):
+def augmentImagesAL(imgsrc, imgdest, perSynthNo, params, max_size = (np.inf, np.inf), min_size = (0, 0)):
 
     '''
     Take an image and randomally augment it using albumentations
     '''
 
-    dirMaker(imgdest + "mask/")
-    dirMaker(imgdest + "img/")
+    dirMaker(imgdest + "masks/")
+    dirMaker(imgdest + "images/")
 
     if type(imgsrc) is list:
         masks, imgs = map(glob, imgsrc)
@@ -704,7 +679,7 @@ def augmentImagesAL(imgsrc, imgdest, perSynthNo, params):
     # use a random selection of the images if there is a limit on the number
     # of images to use
     
-    augmenter = augmentImageAL(imgs, masks, params)
+    augmenter = augmentImageAL(imgs, max_size, min_size, masks, params)
     augLen = augmenter.__len__()
     for n in range(augmenter.__len__()):
         for p in range(perSynthNo):
@@ -715,9 +690,9 @@ def augmentImagesAL(imgsrc, imgdest, perSynthNo, params):
             for m in modImgs:
                 modImg = modImgs[m]
                 if type(modImg) is type(np.array([])):
-                    cv2.imwrite(f"{imgdest}{m}/{name}_{p}.jpg", modImg)
+                    cv2.imwrite(f"{imgdest}{m}/{name}_{p}.png", modImg)
                     imgStore.append(modImg)
-            cv2.imshow("IMG", np.hstack(imgStore)); cv2.waitKey(0)
+            # cv2.imshow("IMG", np.hstack(imgStore)); cv2.waitKey(0)
             # modImg = augResults.img_mask
             
             printProgressBar(p + n*perSynthNo+1, augLen * perSynthNo, "Augmenting", length = 10)
@@ -739,18 +714,18 @@ def createSyntheticMedia(imgsrc, params, dest, synthNoBck = 1, synthNoFore = 1):
     '''
 
     # get the hardcoded paths of all the data
-    bcksrc = imgsrc + "backgrounds/modImages/img/"
-    foresrcImg = imgsrc + "foregrounds/modImages/img/"
-    foresrcMask = imgsrc + "foregrounds/modImages/mask/"
+    bcksrc = imgsrc + "backgrounds/mod/img/"
+    foresrcImg = imgsrc + "foregrounds/mod/img/"
+    foresrcMask = imgsrc + "foregrounds/mod/mask/"
 
     imgDest = dest + "imgs/"
     maskDest = dest + "masks/"
     dirMaker(imgDest)
     dirMaker(maskDest)
 
-    backgroundImgs = sorted(glob(bcksrc + "*.jpg"))
-    foreImgs = sorted(glob(foresrcImg + "*.jpg"))
-    foreMasks = sorted(glob(foresrcMask + "*.jpg"))
+    backgroundImgs = sorted(glob(bcksrc + "*.*"))
+    foreImgs = sorted(glob(foresrcImg + "*.*"))
+    foreMasks = sorted(glob(foresrcMask + "*.*"))
 
     imgs_masks = imgMaskList(foreImgs, foreMasks)
 
@@ -763,8 +738,8 @@ def createSyntheticMedia(imgsrc, params, dest, synthNoBck = 1, synthNoFore = 1):
 
         synthMask = ((synthMask>0)*255).astype(np.uint8)
 
-        cv2.imwrite(f"{imgDest}{n}.jpg", synthImg)
-        cv2.imwrite(f"{maskDest}{n}.jpg", synthMask)
+        cv2.imwrite(f"{imgDest}{n}.png", synthImg)
+        cv2.imwrite(f"{maskDest}{n}.png", synthMask)
 
         printProgressBar(n+1, len(backgroundImgs) * synthNoBck, "SynthData", length=10)
 
@@ -865,7 +840,6 @@ if __name__ == "__main__":
         # A.OpticalDistortion(distort_limit=1, shift_limit=1)
         # A.ElasticTransform(10, 200, 200)
         A.RGBShift()
-
     ])
 
 
