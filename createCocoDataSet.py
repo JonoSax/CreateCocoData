@@ -1,3 +1,7 @@
+'''
+From all data sources, create the coco data set
+'''
+
 from glob import glob
 import json
 import numpy as np
@@ -7,7 +11,7 @@ from itertools import repeat
 from cocoDataStructure.utilities import printProgressBar
 from cocoDataStructure.categories import getCategoriesInfo
 
-def createCocoData(src):
+def createCocoData(src, segData = False):
 
     '''    
     create the master dictionary to put all info
@@ -45,7 +49,7 @@ def createCocoData(src):
     print(f'Using: {", ".join([i.split("/")[-2] for i in imgJson])}')
     lastImgID = 0          # ensure the ids are uniquely assigned
     lastObjID = 0
-    for i, a in zip(imgJson, annosJson):
+    for n, (i, a) in enumerate(zip(imgJson, annosJson)):
 
         print(f'Processing {i.split("/")[-2]}')
 
@@ -56,11 +60,15 @@ def createCocoData(src):
         [exec(f'i["image_id"] += {lastImgID}') for i in annosInfo] 
         [exec(f'i["id"] += {lastObjID}') for i in annosInfo] 
         [exec(f'i["bbox"] = [int(ib) for ib in i["bbox"].split(",")]') for i in annosInfo] 
-        try:
-            # if there are segmentations
-            [exec(f'i["segmentation"] = [[int(ib) for ib in i["segmentation"].split(",")]]') for i in annosInfo] 
-        except:
-            # if there are no segmentations
+        
+        if segData:
+            try:
+                # if there are segmentations
+                [exec(f'i["segmentation"] = [[int(ib) for ib in i["segmentation"].split(",")]]') for i in annosInfo] 
+            except:
+                # if there are no segmentations
+                [exec(f'i["segmentation"] = []') for i in annosInfo] 
+        else:
             [exec(f'i["segmentation"] = []') for i in annosInfo] 
 
         [exec(f'i["iscrowd"] = int(i["iscrowd"])') for i in annosInfo] 
@@ -119,17 +127,18 @@ def getDataSplit(src, split = [0.8, 0.1, 0.1]):
         else:
             testCoco['images'].append(i)
 
-    json.dump(trainCoco, open(src + "trainCoco.json", "w"))
-    json.dump(valCoco, open(src + "valCoco.json", "w"))
-    json.dump(testCoco, open(src + "testCoco.json", "w"))
+    json.dump(trainCoco, open(src + "train.json", "w"))
+    json.dump(valCoco, open(src + "val.json", "w"))
+    json.dump(testCoco, open(src + "test.json", "w"))
 
     print("     Finished getDataSplit")
 
 if __name__ == "__main__":
 
-    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/"
     src = "/Volumes/WorkStorage/BoxFish/dataStore/Aruco+Net/"
-
+    src = "/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/"
+    src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/"
+    src = "/Volumes/USB/data/CocoData/"
     # categoryInfo = getCategoriesInfo(src)
     createCocoData(src)
 
