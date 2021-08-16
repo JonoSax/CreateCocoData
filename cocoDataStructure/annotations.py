@@ -14,6 +14,7 @@ iscrowd
 import numpy as np
 from glob import glob
 import cv2
+from numpy.core.fromnumeric import repeat
 if __name__ == "__main__":
     from utilities import *
 else:
@@ -23,6 +24,8 @@ import os
 import pandas as pd
 import cv2
 import cv2.aruco as aruco
+from multiprocessing import Pool
+from itertools import repeat
 
 def getAnnotations(img):
 
@@ -34,7 +37,6 @@ def getAnnotations(img):
     pixels, segment = getSegmentation(img)
     bbox = getBoundingBox(pixels)
     area = getArea(pixels)
-
     segment = processCoco(segment)
     bbox = processCoco(bbox)
 
@@ -50,10 +52,13 @@ def getDims(img):
 
     return(x, y)
 
-def getSegmentation(img):
+def getSegmentation(img, dsmp = 40):
 
     '''
     Get the list of points which make up the segmentation mask
+
+    img:        numpy array of the image
+    dsmp:       the maximum number of boundary points to use to describe the outline
     '''
 
     # count all the non-zero pixel positions as the mask
@@ -63,20 +68,32 @@ def getSegmentation(img):
     pixels = np.where(imgGray != 0)
 
     # get the top of the image (left to right)
-    border = []
+    x0 = []
+    y0 = []
     for i in range(imgGray.shape[0]):
         pos = np.where((imgGray[i, :])==255)[0]
         if len(pos) > 0:
-            border.append(max(pos))
-            border.append(i)
+            y0.append(max(pos))
+            x0.append(i)
+
 
     # get the bottom of the image (right to left)
+    x1 = []
+    y1 = []
     for i in range(imgGray.shape[0]-1, -1, -1):
         pos = np.where((imgGray[i, :])==255)[0]
         if len(pos) > 0:
-            border.append(min(pos))
-            border.append(i)
+            y1.append(min(pos))
+            x1.append(i)
+    
+    import matplotlib.pyplot as plt
+    if len(x0) + len(x1) > dsmp:
+        x0 = np.interp(np.linspace(0, len(x0), int(dsmp/2)), np.arange(len(x0)), np.array(x0))
+        y0 = np.interp(np.linspace(0, len(y0), int(dsmp/2)), np.arange(len(y0)), np.array(y0))    
+        x1 = np.interp(np.linspace(0, len(x1), int(dsmp/2)), np.arange(len(x1)), np.array(x1))
+        y1 = np.interp(np.linspace(0, len(y1), int(dsmp/2)), np.arange(len(y1)), np.array(y1))    
 
+    border = list(np.hstack(np.c_[list(x0) + list(x1), list(y0) + list(y1)]))
     # formatted for the segment info
     segment = str([border])
 
@@ -146,10 +163,13 @@ def createAnnotationDict(idDict, classDict, seg, area, crowd, imgName, bbox, img
 
     return(annoDict)
 
-def getMaskInfo(src, segData = False): 
+def getMaskInfo(src, detailSegData = False, segData = True, cpuNo = 12): 
 
     '''
     If there are masks then process that info
+
+    detailSegData:      If true, the include every pixel as an annotation
+    segData             If false, don't include any segmentation data
     '''
 
     annotationInfo = []
@@ -159,33 +179,44 @@ def getMaskInfo(src, segData = False):
     idDict = json.load(open(src + "imgDict.json"))
     classDict = json.load(open(src + "classDict.json"))
 
-    for n, m in enumerate(masks):
-        imgName = m.split("/")[-1]
-        imgClass = m.split("/")[-2]
+    if cpuNo:
+        with Pool(cpuNo) as p:
+            annotationInfo = p.starmap(maskInfo, zip(masks, repeat(classDict), repeat(detailSegData), repeat(segData), repeat(idDict),))
 
-        # if the class that is being loaded is not in the dictionary 
-        # then it is being ignored during this data generation 
-        if classDict.get(imgClass) is None:
-            continue
+        # assign a unique annotation id
+        for n, _ in enumerate(annotationInfo):
+            annotationInfo[n]["id"] = n
 
-        if (n/len(masks)*100) % 10 == 0:
-            print(f"getAnnotationInfo:{src.split('/')[-2]} - {n}/{len(masks)}")
-
-        # printProgressBar(n, len(masks) - 1, prefix = 'AnnotationInfo:', suffix = '', length=15)
-        
-        mask = cv2.imread(m)
-        _, segment, area, bbox, _ = getAnnotations(mask)
-
-        if segData:
-            segment = str(list(np.hstack(np.c_[np.where(mask[:, :, 0])])))[1:-1]
-        else:
-            segment = ""
-        annoDict = createAnnotationDict(idDict, classDict, segment, area, 0, imgName, bbox, imgClass, n)
-        
-        if annoDict is not None:
+    else:   
+        for n, m in enumerate(masks):
+            annoDict = maskInfo(m, classDict, detailSegData, segData, idDict)
             annotationInfo.append(annoDict)
 
     return(annotationInfo)
+
+def maskInfo(m, classDict, detailSegData, segData, idDict):
+
+    imgName = m.split("/")[-1]
+    imgClass = m.split("/")[-2]
+
+    # if the class that is being loaded is not in the dictionary 
+    # then it is being ignored during this data generation 
+    if classDict.get(imgClass) is None:
+        return
+   
+    mask = cv2.imread(m)
+    _, segment, area, bbox, _ = getAnnotations(mask)
+
+    if not segData:
+        segment = ""
+
+    elif detailSegData:
+        segment = str(list(np.hstack(np.c_[np.where(mask[:, :, 0])])))[1:-1]
+        
+    annoPlaceHolder = -1
+    annoDict = createAnnotationDict(idDict, classDict, segment, area, 0, imgName, bbox, imgClass, annoPlaceHolder)
+    
+    return(annoDict)
 
 def processQUTData(src, segData = False):
 
@@ -203,6 +234,7 @@ def processQUTData(src, segData = False):
     idDict = json.load(open(src + "imgDict.json"))
     classDict = json.load(open(src + "classDict.json"))
 
+    # NOTE this can be parallelised
     for n, i in enumerate(images):
         imgName = i.split("/")[-1]
         imgClass = i.split("/")[-2]
@@ -389,4 +421,5 @@ if __name__ == "__main__":
     src = "/Volumes/WorkStorage/BoxFish/dataStore/Aruco+Net/net_day_shade_pool/"
     src = "/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/mod/"
     src = "/Volumes/USB/data/YOLO_data/YOLO_data/Ulucan/"
+    src = "/media/boxfish/USB/data/CocoData/Ulucan/"
     getAnnotationInfo(src)  
