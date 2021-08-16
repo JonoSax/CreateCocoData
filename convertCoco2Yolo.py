@@ -10,6 +10,7 @@ from multiprocessing import Pool, Process
 from itertools import repeat
 from random import shuffle
 from overlaySegment import annotateYoloSegments
+import numpy as np
 
 def createYoloData(src, dest):
 
@@ -54,24 +55,29 @@ def createYoloData(src, dest):
     dirMaker(imgDest, True)
 
     images = cocoData["images"]
-    # shuffle(images)
-    images = images[:100]
+    shuffle(images)
     annos = cocoData["annotations"]
 
     # create the dictionary which relates the image ids to their anno ids
     annoIds = createIDDict(annos, "image_id", "*")
 
-    job = []
-    for n, i in enumerate(images):
-        job.append(Process(target=convertData, args=(i, annos, annoIds, labelDest, imgDest)))
-        job[n].start()
-    for n, j in enumerate(job):
-        j.join()
-        printProgressBar(n, len(images) - 1, "Converted: ", length = 20)
 
+    # to ensure that not too many processes are open, divide the data into sections and process
+    sectLen = 2000
+    for imn in range(int(np.ceil(len(images)/sectLen))):
+        imageSect = images[imn*sectLen:(imn+1)*sectLen]
+        job = []
+        for n, i in enumerate(imageSect):
+            job.append(Process(target=convertData, args=(i, annos, annoIds, labelDest, imgDest)))
+            job[n].start()
+        for n, j in enumerate(job):
+            j.join()
+        print(imn * sectLen)
+    print("Done")
+    
 def convertData(i, annos, annoIds, labelDest, imgDest):
 
-    imgPath = i["file_name"]
+    imgPath = i["file_name"].replace("Volumes", "media/boxfish")    # NOTE hardcode replace the path
     imgName = imgPath.split("/")[-1].split(".")[0]
     imgId = i["id"]
     img_h = i["height"]
@@ -86,7 +92,7 @@ def convertData(i, annos, annoIds, labelDest, imgDest):
 
     for a in imgAnno:
         x, y, h, w = a["bbox"]
-        label = a["category_id"]
+        label = a["category_id"] - 1
 
         # get the centre of the annotation
         x += h/2
@@ -107,14 +113,15 @@ if __name__ == "__main__":
 
     multiprocessing.set_start_method("fork")
 
-    srcs = ["/Volumes/USB/data/CocoData/train.json",
-    "/Volumes/USB/data/CocoData/val.json"]
+    srcs = ["/media/boxfish/USB/data/CocoData/train.json",
+    "/media/boxfish/USB/data/CocoData/val.json",
+    "/media/boxfish/USB/data/CocoData/test.json"]
 
-    dest = "/Volumes/USB/data/YoloData/"
+    dest = "/media/boxfish/USB/data/YoloData/"
 
     for src in srcs:
         createYoloData(src, dest)
 
-    yolosrc = "/Volumes/USB/data/YoloData/"
+    yolosrc = "/media/boxfish/USB/data/YoloData/"
 
     annotateYoloSegments(yolosrc, False)
