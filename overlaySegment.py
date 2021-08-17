@@ -21,19 +21,23 @@ def getSegPos(seg):
 
     pixX = []
     pixY = []
-    for n, s in enumerate(seg):
+    try:
+        for n, s in enumerate(seg):
 
-        # for every 2nd value, create a new numpy entry
-        if n%2 == 0:
-            pixX.append(int(np.round(s)))
-        else:
-            pixY.append(int(np.round(s)))
+            # for every 2nd value, create a new numpy entry
+            if n%2 == 0:
+                pixX.append(int(np.round(s)))
+            else:
+                pixY.append(int(np.round(s)))
 
-    pix = np.c_[pixX, pixY]
+        pix = np.c_[pixX, pixY]
+
+    except:
+        pix = []
 
     return(pix)
 
-def annotateCocoSegments(src, random = True):
+def annotateCocoSegments(src, imgsrc = "", random = True):
 
     '''
     Load in the coco information and annotate the segments
@@ -76,7 +80,7 @@ def annotateCocoSegments(src, random = True):
         if imgpath is None:
             continue
 
-        img = cv2.imread(imgpath[0])
+        img = cv2.imread(f"{imgsrc}{imgpath[0]}")
         imgm = img.copy()
 
         for a in annos:
@@ -89,7 +93,14 @@ def annotateCocoSegments(src, random = True):
                 pix = getSegPos(s)
                 
                 for p in pix:
-                    imgm[p[0], p[1]] = [0, 0, 255]
+                    try:
+                        imgm[p[1], p[0]] = [255, 0, 0]
+                        imgm[p[1]+1, p[0]+1] = [255, 0, 0]
+                        imgm[p[1]-1, p[0]+1] = [255, 0, 0]
+                        imgm[p[1]+1, p[0]-1] = [255, 0, 0]
+                        imgm[p[1]-1, p[0]-1] = [255, 0, 0]
+                    except:
+                        pass
                 '''
                 # draw the outline of the annotation
                 for p0, p1 in zip(pix, np.vstack([pix[1:], pix[0]])):
@@ -183,9 +194,15 @@ if __name__ == "__main__":
 
     cocosrc = "/Volumes/WorkStorage/BoxFish/dataStore/Aruco+Net/cocoAll.json"
     cocosrc = "/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/cocoAll.json"
-    cocosrc = "/Volumes/USB/data/YOLO_data/YOLO_data/cocoAll.json"
-    yolosrc = "/Volumes/USB/data/coco128/"
-    yolosrc = "/Volumes/USB/data/YoloData/"
+    
+    cocosrc = "/home/boxfish/Documents/models/yolactMod/data/datasources/coco/train17.json"
+    imgsrc = "/home/boxfish/Documents/models/yolactMod/data/datasources/coco/train17_images/"
 
-    annotateYoloSegments(yolosrc, False)
-    annotateCocoSegments(cocosrc)
+    cocosrc = "/media/boxfish/USB/data/CocoData/cocoAll.json"
+    imgsrc = ""
+
+    yolosrc = "/Volumes/USB/data/coco128/"
+    yolosrc = "/media/boxfish/USB/data/YoloData/"
+
+    annotateCocoSegments(cocosrc, imgsrc)
+    # annotateYoloSegments(yolosrc, False)
