@@ -26,6 +26,10 @@ import cv2
 import cv2.aruco as aruco
 from multiprocessing import Pool
 from itertools import repeat
+if __name__ == "__main__":
+    from utilities import createIDDict
+else:
+    from cocoDataStructure.utilities import createIDDict
 
 '''
 
@@ -333,10 +337,58 @@ def processOpenImagesData(src):
 def processCocoData(src):
 
     '''
-    Function to process coco data sources (BrackishWaterImages and Aquarium)
+    Function to process coco data sources (BrackishWaterImages and Aquarium).
+
+    Even though they are technically in the right format, it needs to be made into 
+    a format which is consistent with all the other data types and the target information 
+    of interest.
     '''
 
-    return
+    testdir = src + "test/"
+    traindir = src + "train/"
+    valdir = src + "val/"
+
+    annotationInfo = []
+
+    # NOTE the annotations have more classes than what may 
+    # be desired for the data generation.
+    classDict = json.load(open(src + "classDict.json"))
+
+    idDict = json.load(open(src + "imgDict.json"))
+
+    jsonData = [json.load(open(src + "cocoAnnotations_train.json")),
+    json.load(open(src + "cocoAnnotations_test.json")),
+    json.load(open(src + "cocoAnnotations_valid.json"))]
+    n = 0
+    for j in jsonData:
+
+        categories = j["categories"]
+        images = j["images"]
+        anno = j["annotations"]
+
+        imgDict = createIDDict(images, "file_name", "id")
+        annoDict = createIDDict(anno, "image_id", "*")
+        categoriesDict = createIDDict(categories, "id", "name")
+        
+        for i in images:
+            imgId = idDict.get(i['file_name'])
+            id = imgDict.get(i["file_name"])[0]
+            annos = annoDict.get(id, False)
+
+            if annos:
+                for a in annos.copy():
+                    # if the label is one of the target categories, include
+                    classId = classDict.get(categoriesDict.get(a.get("category_id"))[0], False)
+                    if classId:
+
+                        a['image_id'] = imgId
+                        a['id'] = n
+                        a['category_id'] = classId
+                        a['bbox'] = ",".join([str(b) for b in a['bbox']])
+                        annotationInfo.append(a)
+                        n += 1
+
+    return(annotationInfo)
 
 def processArucoMarkers(src, segData = False):
 
@@ -414,7 +466,6 @@ def processNorFisk(src):
     Process the NorFisk data set: https://dataverse.no/dataset.xhtml?persistentId=doi:10.18710/H5G3K5
     '''
 
-
     annotationInfo = []
 
     images = sorted(glob(src + "images/**/*"))
@@ -469,7 +520,8 @@ def getAnnotationInfo(src):
             annotationInfo = processArucoMarkers(src)
         elif "norfisk" in src.lower():
             annotationInfo = processNorFisk(src)
-
+        elif "brackishwater" in src.lower():
+            annotationInfo = processCocoData(src)
 
     # save the dictionary as a json file in the src
     json.dump(annotationInfo, open(src + "annotations.json", 'w'))
@@ -483,4 +535,6 @@ if __name__ == "__main__":
     src = "/Volumes/USB/data/YOLO_data/YOLO_data/Ulucan/"
     src = "/media/boxfish/USB/data/CocoData/Ulucan/"
     src = '/media/boxfish/USB/data/CocoData/NorFisk_v1.0/'
+    src = '/Volumes/USB/data/CocoData/BrackishWaterImages/'
+
     getAnnotationInfo(src)  
