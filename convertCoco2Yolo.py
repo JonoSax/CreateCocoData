@@ -83,52 +83,55 @@ def createYoloData(src, dest, parallel = True):
     
 def convertData(i, annos, annoIds, labelDest, imgDest):
 
-    imgPath = i["file_name"].replace("Volumes", "media/boxfish")    # NOTE hardcode replace the path
+    imgPath = i["file_name"]# .replace("Volumes", "media/boxfish")    # NOTE hardcode replace the path
     imgName = imgPath.split("/")[-1].split(".")[0]
     imgId = i["id"]
     img_h = i["height"]
     img_w = i["width"]
 
-    f = open(os.path.join(labelDest, imgName + ".txt"), "w")
+    imgAnno = annoIds.get(imgId, False)
+    if imgAnno:
+        f = open(os.path.join(labelDest, imgName + ".txt"), "w")
 
-    # copy the image to the new destination
-    os.system("cp " + imgPath + " " + imgDest)
+        # copy the image to the new destination
+        os.system("cp " + imgPath + " " + imgDest)
 
-    imgAnno = annoIds[imgId]
 
-    for a in imgAnno:
-        x, y, h, w = a["bbox"]
-        label = a["category_id"] - 1
+        for a in imgAnno:
+            x, y, h, w = a["bbox"]
+            label = a["category_id"] - 1
 
-        # get the centre of the annotation
-        x += h/2
-        y += w/2
+            # get the centre of the annotation
+            x += h/2
+            y += w/2
 
-        # normalise the coordinates
-        x /= img_w
-        y /= img_h
-        h /= img_w
-        w /= img_h
+            # normalise the coordinates
+            x /= img_w
+            y /= img_h
+            h /= img_w
+            w /= img_h
 
-        f.write(f"{label} {x} {y} {h} {w}\n")
+            f.write(f"{label} {x} {y} {h} {w}\n")
 
-    f.close()
-
+        f.close()
 
 if __name__ == "__main__":
 
     multiprocessing.set_start_method("fork")
 
-    srcs = ["/media/boxfish/USB/data/CocoData/train.json",
-    "/media/boxfish/USB/data/CocoData/val.json",
-    "/media/boxfish/USB/data/CocoData/test.json"]
+    wd = "/medai/boxfish/USB/data/"
+    wd = "/Volumes/USB/data/"
 
-    yolosrc = "/media/boxfish/USB/data/YoloData/"
-    yolosrc = "/media/boxfish/USB/data/YoloDataSalmon/"
+    srcs = [wd + "CocoData/train.json",
+    wd + "CocoData/val.json",
+    wd + "CocoData/test.json"]
+
+    yolosrc = wd + "YoloData/"
+    yolosrc = wd + "YoloDataBrackish/"
 
     for src in srcs:
     
-        createYoloData(src, yolosrc)
+        createYoloData(src, yolosrc, False)
 
 
     annotateYoloSegments(yolosrc, False)
