@@ -12,7 +12,7 @@ from random import shuffle
 from overlaySegment import annotateYoloSegments
 import numpy as np
 
-def createYoloData(src, dest):
+def createYoloData(src, dest, parallel = True):
 
     '''
     Take the coco data and convert into yolo
@@ -63,16 +63,22 @@ def createYoloData(src, dest):
 
 
     # to ensure that not too many processes are open, divide the data into sections and process
-    sectLen = 2000
-    for imn in range(int(np.ceil(len(images)/sectLen))):
-        imageSect = images[imn*sectLen:(imn+1)*sectLen]
-        job = []
-        for n, i in enumerate(imageSect):
-            job.append(Process(target=convertData, args=(i, annos, annoIds, labelDest, imgDest)))
-            job[n].start()
-        for n, j in enumerate(job):
-            j.join()
-        print(imn * sectLen)
+    
+    if parallel:
+        sectLen = 2000
+        for imn in range(int(np.ceil(len(images)/sectLen))):
+            imageSect = images[imn*sectLen:(imn+1)*sectLen]
+            job = []
+            for n, i in enumerate(imageSect):
+                job.append(Process(target=convertData, args=(i, annos, annoIds, labelDest, imgDest)))
+                job[n].start()
+            for n, j in enumerate(job):
+                j.join()
+            print(imn * sectLen)
+
+    else:
+        for i in images:
+            convertData(i, annos, annoIds, labelDest, imgDest)
     print("Done")
     
 def convertData(i, annos, annoIds, labelDest, imgDest):
@@ -117,11 +123,12 @@ if __name__ == "__main__":
     "/media/boxfish/USB/data/CocoData/val.json",
     "/media/boxfish/USB/data/CocoData/test.json"]
 
-    dest = "/media/boxfish/USB/data/YoloData/"
+    yolosrc = "/media/boxfish/USB/data/YoloData/"
+    yolosrc = "/media/boxfish/USB/data/YoloDataSalmon/"
 
     for src in srcs:
-        createYoloData(src, dest)
+    
+        createYoloData(src, yolosrc)
 
-    yolosrc = "/media/boxfish/USB/data/YoloData/"
 
     annotateYoloSegments(yolosrc, False)
