@@ -27,6 +27,17 @@ import cv2.aruco as aruco
 from multiprocessing import Pool
 from itertools import repeat
 
+'''
+
+NOTE: Work to improve:
+
+    - the classdict.json file which these all depend on is pretty tedious to 
+    make. Automate....
+
+    - Parallelise the individual processing functions
+
+'''
+
 def getAnnotations(img):
 
     '''
@@ -93,7 +104,7 @@ def getSegmentation(img, dsmp = 40):
         x1 = np.interp(np.linspace(0, len(x1), int(dsmp/2)), np.arange(len(x1)), np.array(x1))
         y1 = np.interp(np.linspace(0, len(y1), int(dsmp/2)), np.arange(len(y1)), np.array(y1))    
 
-    border = list(np.hstack(np.c_[list(x0) + list(x1), list(y0) + list(y1)]))
+    border = list(np.hstack(np.c_[list(y0) + list(y1), list(x0) + list(x1)]))
     # formatted for the segment info
     segment = str([border])
 
@@ -397,6 +408,53 @@ def processArucoMarkers(src, segData = False):
 
     return(annotationInfo)
 
+def processNorFisk(src):
+
+    '''
+    Process the NorFisk data set: https://dataverse.no/dataset.xhtml?persistentId=doi:10.18710/H5G3K5
+    '''
+
+
+    annotationInfo = []
+
+    images = sorted(glob(src + "images/**/*"))
+
+    idDict = json.load(open(src + "imgDict.json"))
+    classDict = json.load(open(src + "classDict.json"))
+
+    annos = sorted(glob(src + "annotations/**/*"))
+
+    for n, anno in enumerate(annos):
+
+            annoImg = open(anno, "r").readlines()[0].split("\n")[:-1]
+
+            isGroup = 0
+
+            # atm hardcode the label
+            label = 'fish'
+
+            for a in annoImg:
+
+                imgName, _, x0, y0, x1, y1, xm, ym = a.split(",")
+
+                # names originall were seperated by a '.' but this has been removed
+                imgName = imgName.replace("d.", "d_")
+
+                x0 = int(x0)
+                x1 = int(x1)
+                y0 = int(y0)
+                y1 = int(y1)
+
+                bbox = f"{x0},{y0},{x1-x0},{y1-y0}"
+                area = (x1-x0)*(y1-y0)
+
+                annoDict = createAnnotationDict(idDict, classDict, "", area, isGroup, imgName, bbox, label, n)
+                
+                if annoDict is not None:
+                    annotationInfo.append(annoDict)
+
+    return(annotationInfo)
+
 def getAnnotationInfo(src):
 
     # if there are masks then process that info
@@ -409,6 +467,8 @@ def getAnnotationInfo(src):
             annotationInfo = processOpenImagesData(src)
         elif "aruco" in src.lower():
             annotationInfo = processArucoMarkers(src)
+        elif "norfisk" in src.lower():
+            annotationInfo = processNorFisk(src)
 
 
     # save the dictionary as a json file in the src
@@ -422,4 +482,5 @@ if __name__ == "__main__":
     src = "/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/mod/"
     src = "/Volumes/USB/data/YOLO_data/YOLO_data/Ulucan/"
     src = "/media/boxfish/USB/data/CocoData/Ulucan/"
+    src = '/media/boxfish/USB/data/CocoData/NorFisk_v1.0/'
     getAnnotationInfo(src)  
