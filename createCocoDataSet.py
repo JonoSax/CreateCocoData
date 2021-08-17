@@ -126,15 +126,15 @@ def getDataSplit(src, split = [0.8, 0.1, 0.1]):
         imId = i['id']
         if r < train:
             trainCoco['images'].append(i)
-            for a in annoId[imId]:
+            for a in annoId.get(imId, []):
                 trainCoco['annotations'].append(a)
         elif r < train + val:
             valCoco['images'].append(i)
-            for a in annoId[imId]:
+            for a in annoId.get(imId, []):
                 valCoco['annotations'].append(a)
         else:
             testCoco['images'].append(i)
-            for a in annoId[imId]:
+            for a in annoId.get(imId, []):
                 testCoco['annotations'].append(a)
 
     json.dump(trainCoco, open(src + "train.json", "w"))
@@ -149,6 +149,8 @@ if __name__ == "__main__":
     src = "/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/"
     src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/"
     src = "/media/boxfish/USB/data/CocoData/"
+    src = "/Volumes/USB/data/CocoData/"
+
     # categoryInfo = getCategoriesInfo(src)
     createCocoData(src, True)
 
