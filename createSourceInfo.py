@@ -18,15 +18,16 @@ if __name__ == "__main__":
 
     cpuNo = 1
     
+    wd = "/media/boxfish/USB/data/CocoData/"
     wd = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/CocoData/"
     wd = "/Volumes/USB/data/CocoData/"
-    wd = "/media/boxfish/USB/data/CocoData/"
 
     srcs = [wd + "Ulucan/",
     wd + "Fish4Knowledge/",
     wd + "openimages/",
     wd + "QUT/", 
-    wd + "NorFisk_v1.0/"]
+    wd + "NorFisk_v1.0/",
+    wd + "BrackishWaterImages/"]
 
     # srcs = ["/Volumes/WorkStorage/BoxFish/dataStore/Aruco+Net/net_day_shade_pool/"]
     # srcs = ["/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/mod/"]
