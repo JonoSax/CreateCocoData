@@ -114,8 +114,8 @@ def getDataSplit(src, split = [0.8, 0.1, 0.1]):
     cocoAll = json.load(open(src + "cocoAll.json", "r"))
 
     trainCoco = cocoAll.copy(); trainCoco["images"] = []; trainCoco["annotations"] = []
-    valCoco = cocoAll.copy(); valCoco["images"] = []; trainCoco["annotations"] = []
-    testCoco = cocoAll.copy(); testCoco["images"] = []; trainCoco["annotations"] = []
+    valCoco = cocoAll.copy(); valCoco["images"] = []; valCoco["annotations"] = []
+    testCoco = cocoAll.copy(); testCoco["images"] = []; testCoco["annotations"] = []
 
     imgs = cocoAll["images"]
 
@@ -150,6 +150,6 @@ if __name__ == "__main__":
     src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/"
     src = "/media/boxfish/USB/data/CocoData/"
     # categoryInfo = getCategoriesInfo(src)
-    # createCocoData(src, True)
+    createCocoData(src, True)
 
     getDataSplit(src)
