@@ -14,12 +14,34 @@ if __name__ == "__main__":
     from utilities import *
 else:
     from cocoDataStructure.utilities import *
+import multiprocessing
+from multiprocessing import Pool
+from spare.createSyntheticData import imgMaskList
 import numpy as np
 from glob import glob
 import cv2
 import json
+from itertools import repeat
 
-def getImageInfo(src, relative_path=False):
+
+def getImgInfo(i, relative_path, idDict, q = None):
+
+    imgName = i.split("/")[-1]
+    # printProgressBar(n, len(imgs) - 1, prefix = f'getImageInfo:{imgName}', suffix = 'Complete', length = 15)
+    img = cv2.imread(i)
+    imgDict = {}
+    if relative_path:
+        imgDict["file_name"] = "/".join(i.split("/")[-4:])      # images are 4 levels deep in the directory
+    else:
+        imgDict['file_name'] = i
+    imgDict['id'] = idDict[imgName]
+    imgDict['height'] = img.shape[0]
+    imgDict['width'] = img.shape[1]
+    imgDict['date_captured'] = ""                # date captured not critical
+    
+    return(imgDict)
+
+def getImageInfo(src, relative_path=False, cpuNo = 4):
 
     '''
     Populate the image info for a given data source
@@ -29,24 +51,15 @@ def getImageInfo(src, relative_path=False):
 
     imgs = sorted(glob(src + "images/**/*"))
 
-    imgsInfo = []
+    if cpuNo > 1:
+        with Pool(cpuNo) as p:
+            imgsInfo = p.starmap(getImgInfo, zip(imgs, repeat(relative_path), repeat(idDict), ))
+    else:
+        imgsInfo = []
+        for n, i in enumerate(imgs):
+            imgDict = getImgInfo(i, relative_path, idDict)
+            imgsInfo.append(imgDict)
 
-    for n, i in enumerate(imgs):
-        if (n/len(imgs)*100) % 10 == 0:
-            print(f"getImageInfo:{src.split('/')[-2]} - {n}/{len(imgs)}")
-        imgName = i.split("/")[-1]
-        # printProgressBar(n, len(imgs) - 1, prefix = f'getImageInfo:{imgName}', suffix = 'Complete', length = 15)
-        img = cv2.imread(i)
-        imgDict = {}
-        if relative_path:
-            imgDict["file_name"] = "/".join(i.split("/")[-4:])      # images are 4 levels deep in the directory
-        else:
-            imgDict['file_name'] = i
-        imgDict['id'] = idDict[imgName]
-        imgDict['height'] = img.shape[0]
-        imgDict['width'] = img.shape[1]
-        imgDict['date_captured'] = ""                # date captured not critical
-        imgsInfo.append(imgDict)
 
     # save the dictionary as a json file in the src
     if imgsInfo != []:
