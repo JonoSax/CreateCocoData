@@ -8,7 +8,7 @@ import numpy as np
 from random import random
 from itertools import repeat
 
-from cocoDataStructure.utilities import printProgressBar
+from cocoDataStructure.utilities import getClassDict, printProgressBar
 from cocoDataStructure.categories import getCategoriesInfo
 from cocoDataStructure.utilities import createIDDict
 
@@ -41,13 +41,40 @@ def createCocoData(src, segData = False):
         "date_created": "2021/06/10"
     }
 
-    cocoInfo["categories"] = json.load(open(src + "categories.json"))
-
+    a = json.load(open(src + "categories.json"))
+    cocoInfo["categories"] = getClassDict(src)
     imgInfoAll = []
     annotationInfoAll = []
     imgJson = sorted(glob(src + "*/images.json"))
     annosJson = sorted(glob(src + "*/annotations.json"))
-    print(f'Using: {", ".join([i.split("/")[-2] for i in imgJson])}')
+    print("Select which dataset you want to use. Press enter for each one and enter twice to continue.")
+    # print(f'Available: {", ".join([str(n) + ": " + i.split("/")[-2] + "\n") for n, i in enumerate(imgJson)]}')
+    
+    options = [i.split("/")[-2] for i in imgJson]
+    print("Available data sets:")
+    for n, o in enumerate(options):
+        print(f"{n}: {o}")
+    select = []
+    while True:
+        inp = input()
+        if inp == "":
+            break
+        v = int(inp.split("\n")[0])
+        if v < 0 or v > len(options):
+            print("Input invalid")
+            continue 
+        else:
+            select.append(v)
+
+        print(f'    {options[v]} selected')
+
+    if select == []:
+        print("No data set selected")
+        return
+    else:
+        imgJson = [imgJson[s] for s in select]
+        annosJson = [annosJson[s] for s in select]
+
     lastImgID = 0          # ensure the ids are uniquely assigned
     lastObjID = 0
     for n, (i, a) in enumerate(zip(imgJson, annosJson)):
@@ -60,12 +87,12 @@ def createCocoData(src, segData = False):
         [exec(f'i["id"] += {lastImgID}') for i in imgInfo]       # adjust the ID's
         [exec(f'i["image_id"] += {lastImgID}') for i in annosInfo] 
         [exec(f'i["id"] += {lastObjID}') for i in annosInfo] 
-        [exec(f'i["bbox"] = [int(ib) for ib in i["bbox"].split(",")]') for i in annosInfo] 
+        [exec(f'i["bbox"] = [int(float(ib)) for ib in i["bbox"].split(",")]') for i in annosInfo] 
         
         if segData:
             try:
                 # if there are segmentations
-                [exec(f'i["segmentation"] = [[float(ib) for ib in i["segmentation"].split(",")]]') for i in annosInfo] 
+                [exec(f'i["segmentation"] = [[float(ib) for ib in i["segmentation"].split(",")]]') for i in annosInfo if type(i)==list] 
             except:
                 # if there are no segmentations
                 [exec(f'i["segmentation"] = []') for i in annosInfo] 
@@ -148,8 +175,8 @@ if __name__ == "__main__":
     src = "/Volumes/WorkStorage/BoxFish/dataStore/Aruco+Net/"
     src = "/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/"
     src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/"
-    src = "/media/boxfish/USB/data/CocoData/"
     src = "/Volumes/USB/data/CocoData/"
+    src = "/media/boxfish/USB/data/CocoData/"
 
     # categoryInfo = getCategoriesInfo(src)
     createCocoData(src, True)
