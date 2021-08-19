@@ -47,9 +47,11 @@ def getImageInfo(src, relative_path=False, cpuNo = 4):
     Populate the image info for a given data source
     '''
 
+    print(f"Analysing {src.split('/')[-2]} images")
+
     idDict = json.load(open(src + "imgDict.json"))
 
-    imgs = sorted(glob(src + "images/**/*"))
+    imgs = getAllImages(src)
 
     if cpuNo > 1:
         with Pool(cpuNo) as p:
@@ -64,6 +66,8 @@ def getImageInfo(src, relative_path=False, cpuNo = 4):
     # save the dictionary as a json file in the src
     if imgsInfo != []:
         json.dump(imgsInfo, open(src + "images.json", "w"))
+
+    print(f"    Finished {src.split('/')[-2]}")
 
     return(imgsInfo)
 
