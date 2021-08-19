@@ -63,7 +63,6 @@ def createYoloData(src, dest, parallel = True):
 
 
     # to ensure that not too many processes are open, divide the data into sections and process
-    
     if parallel:
         sectLen = 2000
         for imn in range(int(np.ceil(len(images)/sectLen))):
@@ -83,8 +82,13 @@ def createYoloData(src, dest, parallel = True):
     
 def convertData(i, annos, annoIds, labelDest, imgDest):
 
-    imgPath = i["file_name"]# .replace("Volumes", "media/boxfish")    # NOTE hardcode replace the path
-    imgName = imgPath.split("/")[-1].split(".")[0]
+    imgPath = i["file_name"].replace("Volumes", "media/boxfish")    # NOTE hardcode replace the path
+    
+    # get the image name and remove the prefix
+    imgName = imgPath.split("/")[-1]
+    imgPrefix = f'.{imgName.split(".")[-1]}'
+    imgName = imgName.replace(imgPrefix, "")
+
     imgId = i["id"]
     img_h = i["height"]
     img_w = i["width"]
@@ -119,19 +123,20 @@ if __name__ == "__main__":
 
     multiprocessing.set_start_method("fork")
 
-    wd = "/medai/boxfish/USB/data/"
     wd = "/Volumes/USB/data/"
+    wd = "/media/boxfish/USB/data/"
 
     srcs = [wd + "CocoData/train.json",
     wd + "CocoData/val.json",
     wd + "CocoData/test.json"]
 
-    yolosrc = wd + "YoloData/"
     yolosrc = wd + "YoloDataBrackish/"
+    yolosrc = wd + "YoloData/"
+    yolosrc = wd + "YoloDataGloryBay/"
+
 
     for src in srcs:
-    
-        createYoloData(src, yolosrc, False)
+        createYoloData(src, yolosrc, True)
 
 
-    annotateYoloSegments(yolosrc, False)
+    annotateYoloSegments(yolosrc, True)
