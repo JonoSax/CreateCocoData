@@ -26,10 +26,7 @@ import cv2
 import cv2.aruco as aruco
 from multiprocessing import Pool
 from itertools import repeat
-if __name__ == "__main__":
-    from utilities import createIDDict
-else:
-    from cocoDataStructure.utilities import createIDDict
+
 
 '''
 
@@ -178,7 +175,7 @@ def createAnnotationDict(idDict, classDict, seg, area, crowd, imgName, bbox, img
 
     return(annoDict)
 
-def getMaskInfo(src, detailSegData = False, segData = True, cpuNo = 12): 
+def getMaskInfo(src, classDict, detailSegData = False, segData = True, cpuNo = 12): 
 
     '''
     If there are masks then process that info
@@ -192,7 +189,6 @@ def getMaskInfo(src, detailSegData = False, segData = True, cpuNo = 12):
     masks = sorted(glob(src + "masks/**/*"))
 
     idDict = json.load(open(src + "imgDict.json"))
-    classDict = json.load(open(src + "classDict.json"))
 
     if cpuNo:
         with Pool(cpuNo) as p:
@@ -233,7 +229,7 @@ def maskInfo(m, classDict, detailSegData, segData, idDict):
     
     return(annoDict)
 
-def processQUTData(src, segData = False):
+def processQUTData(src, classDict, segData = False):
 
     '''
     Function to process the QUT data source.
@@ -247,7 +243,6 @@ def processQUTData(src, segData = False):
     images = sorted(glob(src + "images/**/*"))
 
     idDict = json.load(open(src + "imgDict.json"))
-    classDict = json.load(open(src + "classDict.json"))
 
     # NOTE this can be parallelised
     for n, i in enumerate(images):
@@ -274,7 +269,7 @@ def processQUTData(src, segData = False):
 
     return(annotationInfo)
 
-def processOpenImagesData(src):
+def processOpenImagesData(src, classDict):
 
     '''
     Function to process the openimages data source
@@ -317,7 +312,6 @@ def processOpenImagesData(src):
 
     annotationInfo = []
 
-    classDict = json.load(open(src + "classDict.json"))
     idDict = json.load(open(src + "imgDict.json"))
     openImagesDict = open(src + "class-descriptions-boxable.csv")
     LabelNameDict = {}
@@ -334,7 +328,22 @@ def processOpenImagesData(src):
 
     return(annotationInfo)
 
-def processCocoData(src):
+def getCocoJsonInfo(src):
+
+    '''
+    For the specific coco data types, get the source of the coco files
+    '''
+
+    if "brackishwater" in src.lower():
+        jsonData = [json.load(open(src + "cocoAnnotations_train.json")),
+            json.load(open(src + "cocoAnnotations_test.json")),
+            json.load(open(src + "cocoAnnotations_valid.json"))]
+    elif "bigglorybay" in src.lower():
+        jsonData = [json.load(open(src + "BigGloryBayExtractAll.json"))]
+
+    return(jsonData)
+
+def processCocoData(src, classDict):
 
     '''
     Function to process coco data sources (BrackishWaterImages and Aquarium).
@@ -344,21 +353,12 @@ def processCocoData(src):
     of interest.
     '''
 
-    testdir = src + "test/"
-    traindir = src + "train/"
-    valdir = src + "val/"
-
     annotationInfo = []
-
-    # NOTE the annotations have more classes than what may 
-    # be desired for the data generation.
-    classDict = json.load(open(src + "classDict.json"))
 
     idDict = json.load(open(src + "imgDict.json"))
 
-    jsonData = [json.load(open(src + "cocoAnnotations_train.json")),
-    json.load(open(src + "cocoAnnotations_test.json")),
-    json.load(open(src + "cocoAnnotations_valid.json"))]
+    jsonData = getCocoJsonInfo(src)
+
     n = 0
     for j in jsonData:
 
@@ -372,13 +372,13 @@ def processCocoData(src):
         
         for i in images:
             imgId = idDict.get(i['file_name'])
-            id = imgDict.get(i["file_name"])[0]
+            id = imgDict.get(i["file_name"])
             annos = annoDict.get(id, False)
 
             if annos:
                 for a in annos.copy():
                     # if the label is one of the target categories, include
-                    classId = classDict.get(categoriesDict.get(a.get("category_id"))[0], False)
+                    classId = classDict.get(categoriesDict.get(a.get("category_id")), False)
                     if classId:
 
                         a['image_id'] = imgId
@@ -390,7 +390,7 @@ def processCocoData(src):
 
     return(annotationInfo)
 
-def processArucoMarkers(src, segData = False):
+def processArucoMarkers(src, classDict, segData = False):
 
     '''
     Segment the aruco markers and create their masks
@@ -401,8 +401,6 @@ def processArucoMarkers(src, segData = False):
     arucoDict = aruco.getPredefinedDictionary(aruco.DICT_ARUCO_ORIGINAL)
 
     idDict = json.load(open(src + "imgDict.json"))
-
-    classDict = json.load(open(src + "classDict.json"))
 
     annotationInfo = []                
 
@@ -460,7 +458,7 @@ def processArucoMarkers(src, segData = False):
 
     return(annotationInfo)
 
-def processNorFisk(src):
+def processNorFisk(src, classDict):
 
     '''
     Process the NorFisk data set: https://dataverse.no/dataset.xhtml?persistentId=doi:10.18710/H5G3K5
@@ -471,7 +469,6 @@ def processNorFisk(src):
     images = sorted(glob(src + "images/**/*"))
 
     idDict = json.load(open(src + "imgDict.json"))
-    classDict = json.load(open(src + "classDict.json"))
 
     annos = sorted(glob(src + "annotations/**/*"))
 
@@ -509,22 +506,31 @@ def processNorFisk(src):
 def getAnnotationInfo(src):
 
     # if there are masks then process that info
+    # Get the class dictionary which is one directory above the data
+
+    print(f"Getting annotations info for {src.split('/')[-2]}")
+
+    classSrc = "/".join(src.split("/")[:-2])
+    classDict = createIDDict(getClassDict(classSrc), "name", "id")
+
     if os.path.isdir(src + "masks/"):
-        annotationInfo = getMaskInfo(src)
+        annotationInfo = getMaskInfo(src, classDict)
     else:
         if "qut" in src.lower():
-            annotationInfo = processQUTData(src)
+            annotationInfo = processQUTData(src, classDict)
         elif "openimages" in src.lower():
-            annotationInfo = processOpenImagesData(src)
+            annotationInfo = processOpenImagesData(src, classDict)
         elif "aruco" in src.lower():
-            annotationInfo = processArucoMarkers(src)
+            annotationInfo = processArucoMarkers(src, classDict)
         elif "norfisk" in src.lower():
-            annotationInfo = processNorFisk(src)
-        elif "brackishwater" in src.lower():
-            annotationInfo = processCocoData(src)
+            annotationInfo = processNorFisk(src, classDict)
+        else:
+            annotationInfo = processCocoData(src, classDict)
 
     # save the dictionary as a json file in the src
     json.dump(annotationInfo, open(src + "annotations.json", 'w'))
+
+    print(f"    Finished {src.split('/')[-2]}")
 
     return(annotationInfo)   
 
@@ -534,7 +540,9 @@ if __name__ == "__main__":
     src = "/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/mod/"
     src = "/Volumes/USB/data/YOLO_data/YOLO_data/Ulucan/"
     src = "/media/boxfish/USB/data/CocoData/Ulucan/"
-    src = '/media/boxfish/USB/data/CocoData/NorFisk_v1.0/'
     src = '/Volumes/USB/data/CocoData/BrackishWaterImages/'
+    src = '/media/boxfish/USB/data/CocoData/BrackishWaterImages/'
+    src = '/media/boxfish/USB/data/CocoData/NorFisk_v1.0/'
+    src = '/media/boxfish/USB/data/CocoData/BigGloryBay/'
 
     getAnnotationInfo(src)  
