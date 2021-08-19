@@ -80,7 +80,7 @@ def annotateCocoSegments(src, imgsrc = "", random = True):
         if imgpath is None:
             continue
 
-        img = cv2.imread(f"{imgsrc}{imgpath[0]}")
+        img = cv2.imread(f"{imgsrc}{imgpath}")
         imgm = img.copy()
 
         for a in annos:
@@ -94,11 +94,7 @@ def annotateCocoSegments(src, imgsrc = "", random = True):
                 
                 for p in pix:
                     try:
-                        imgm[p[1], p[0]] = [255, 0, 0]
-                        imgm[p[1]+1, p[0]+1] = [255, 0, 0]
-                        imgm[p[1]-1, p[0]+1] = [255, 0, 0]
-                        imgm[p[1]+1, p[0]-1] = [255, 0, 0]
-                        imgm[p[1]-1, p[0]-1] = [255, 0, 0]
+                        cv2.circle(imgm, p.astype(int), 5, [255, 0, 0], 4)
                     except:
                         pass
                 '''
@@ -122,9 +118,14 @@ def annotateCocoSegments(src, imgsrc = "", random = True):
             xp = int(np.median([x0, x1]))
             yp = int(np.median([y0, y1]))
             
-            cv2.putText(imgm, str(a["iscrowd"]), (xp, yp), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-            
+            cv2.putText(imgm, str(f"Crowd: {a['iscrowd']}"), (xp, yp), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 2)
+            cv2.putText(imgm, str(f"Class: {cat}"), (xp, yp+50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 2)
         imgC = np.hstack([img, imgm])
+        xc, yc, _ = imgC.shape
+        if xc*yc > 3e6:
+            r = 5e6/(xc*yc)
+            imgC = cv2.resize(imgC, (int(imgC.shape[1]*r), int(imgC.shape[0]*r)))
+
         cv2.imshow("img", imgC); cv2.waitKey(0)
         randomCount += 1
 
@@ -144,8 +145,10 @@ def annotateYoloSegments(src, random = True):
     # src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Aquarium/test/"
     # jsonsrc = src+"_annotations.coco.json"
 
-    annos = sorted(glob(src+"labels/*/*.txt"))
     images = sorted(glob(src+"images/*/*.*"))
+
+    # annotations must be he same name as the images (except the suffix)
+    annos = [i.replace(f".{i.split('/')[-1].split('.')[-1]}", ".txt").replace("images", "labels") for i in images]
 
     if random:
         ids = np.arange(len(images))
@@ -164,9 +167,9 @@ def annotateYoloSegments(src, random = True):
         for anno in annos:
 
             anno = anno.replace("\n", "")
-            id, xC, yC, w, h = anno.split(" ")
+            cat, xC, yC, w, h = anno.split(" ")
 
-            print(f"ID = {id}")
+            print(f"class = {cat}")
 
             # get the corners of the bounding box
             x0 = int((float(xC) - float(w)/2) * x)
@@ -182,8 +185,15 @@ def annotateYoloSegments(src, random = True):
             
             xp = int(np.median([x0, x1]))
             yp = int(np.median([y0, y1]))
+            cv2.putText(imgm, str(f"Class: {cat}"), (xp, yp), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 2)
+
             
         imgC = np.hstack([img, imgm])
+        xc, yc, _ = imgC.shape
+        if xc*yc > 5e6:
+            r = 5e6/(xc*yc)
+            imgC = cv2.resize(imgC, (int(imgC.shape[1]*r), int(imgC.shape[0]*r)))
+
         cv2.imshow("img", imgC); cv2.waitKey(0)
 
         # y0, x0, y1, x1 = np.array(bbox.replace("[", "").replace("]", "").replace(" ", "").split(",")).astype(int)
@@ -198,11 +208,17 @@ if __name__ == "__main__":
     cocosrc = "/home/boxfish/Documents/models/yolactMod/data/datasources/coco/train17.json"
     imgsrc = "/home/boxfish/Documents/models/yolactMod/data/datasources/coco/train17_images/"
 
+
+
+    cocosrc = "/media/boxfish/USB/Kingston/testVids/extract/BigGloryBayExtractAll.json"
+    imgsrc = "/media/boxfish/USB/Kingston/testVids/extract/"
+
     cocosrc = "/media/boxfish/USB/data/CocoData/cocoAll.json"
     imgsrc = ""
 
-    yolosrc = "/Volumes/USB/data/coco128/"
-    yolosrc = "/media/boxfish/USB/data/YoloData/"
+    # annotateCocoSegments(cocosrc, imgsrc)
 
-    annotateCocoSegments(cocosrc, imgsrc)
-    # annotateYoloSegments(yolosrc, False)
+
+    yolosrc = "/Volumes/USB/data/coco128/"
+    yolosrc = "/media/boxfish/USB/data/YoloDataGloryBay/"
+    annotateYoloSegments(yolosrc, False)
