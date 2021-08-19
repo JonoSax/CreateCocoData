@@ -30,7 +30,7 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     if iteration == total: 
         print()
 
-def createIDDict(targetdict, keytype, classtype, pathsrc = None):
+def createIDDict(targetdict, keytype, classtype, pathsrc = None, singleEntry = True):
 
     '''
     Create a dictionary which extracts information from within a list of dictionaries
@@ -53,12 +53,15 @@ def createIDDict(targetdict, keytype, classtype, pathsrc = None):
         key = i[keytype]
         if imgDict.get(key) is None:
             imgDict[key] = []
+
         if classtype == "*":
             imgDict[key].append(i)
+        elif singleEntry:
+            imgDict[key] = i.get(classtype)
         elif pathsrc is None:
             imgDict[key].append(i[classtype])
         else:
-            imgDict[key].append(pathsrc + str(i[classtype]))
+            imgDict[key].append(f"{pathsrc}{str(i.get(classtype))}")
 
     return(imgDict)
 
@@ -66,7 +69,7 @@ def associateImageID(src):
 
     print(f"Associating {src.split('/')[-2]} id")
 
-    imgs = sorted(glob(src + "images/**/*"))
+    imgs = getAllImages(src)
 
     imgNames = [i.split("/")[-1] for i in imgs]
 
@@ -154,7 +157,42 @@ def dirMaker(dir, remove = False):
     # if the directory exists and the user want to create a clean directory, remove the 
     # dir and create a new one
     if madeNew == False and remove == True:
+        print(f"Cleaning {dir}")
         shutil.rmtree(dir)
         madeNew = make()
     
     return(madeNew)
+
+def getAllImages(src):
+
+    '''
+    Recursively get all images in a directory
+    '''
+
+    imgFormats = ["jpg", "jpeg", "png", "tif"]
+    imgs = []
+    for i in imgFormats:
+        imgs += sorted(glob(f'{src}/**/*.{i}', recursive=True))
+
+    return(imgs)
+
+def getClassDict(src):
+
+    '''
+    Read in the text list of classes and their IDs
+    '''
+
+    classInfo = open(src + "/ClassDict.txt").readlines()
+
+    classList = []
+    for c in classInfo:
+        name, id = c.replace("\n", "").split(",")
+        classDict = {}
+        classDict["name"] = name
+        classDict["id"] = int(id)
+        classList.append(classDict)
+
+    return(classList)
+
+
+    
