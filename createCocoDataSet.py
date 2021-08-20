@@ -11,8 +11,10 @@ from itertools import repeat
 from cocoDataStructure.utilities import getClassDict, printProgressBar
 from cocoDataStructure.categories import getCategoriesInfo
 from cocoDataStructure.utilities import createIDDict
+from overlaySegment import annotateCocoSegments
+from random import shuffle
 
-def createCocoData(src, segData = False):
+def createCocoData(src, segData = False, maxPerSet = None):
 
     '''    
     create the master dictionary to put all info
@@ -42,7 +44,34 @@ def createCocoData(src, segData = False):
     }
 
     a = json.load(open(src + "categories.json"))
-    cocoInfo["categories"] = getClassDict(src)
+    classes =  getClassDict(src)
+    print("Select classes to include:")
+    for n, c in enumerate(classes):
+        print(f"{n}: {c.get('name')}")
+
+    select = []
+    while True:
+        inp = input()
+        if inp == "":
+            break
+        v = int(inp.split("\n")[0])
+        if v < 0 or v > len(classes):
+            print("Input invalid")
+            continue 
+        else:
+            select.append(v)
+
+        print(f'    {classes[v]} selected')
+
+    if select == []:
+        print("No data set selected")
+        return
+    else:
+        classDict = [classes[s] for s in select]
+
+    classIds = [c.get('id') for c in classDict]
+
+    cocoInfo["categories"] = classDict
     imgInfoAll = []
     annotationInfoAll = []
     imgJson = sorted(glob(src + "*/images.json"))
@@ -84,15 +113,27 @@ def createCocoData(src, segData = False):
         imgInfo = json.load(open(i))
         annosInfo = json.load(open(a))
 
+        # only include annotations which are of the selected classes
+        annosInfo = [a for a in annosInfo if a["category_id"] in classIds]
+
+        # ensure that if there is a limit of the images to use, they are ones
+        # which have the relevant annotations
+        if maxPerSet is not None:
+            imgIds = [a["image_id"] for a in annosInfo]
+            shuffle(imgIds)
+            imgIds = imgIds[:maxPerSet]
+            imgInfo = [i for i in imgInfo if i["id"] in imgIds]
+
         [exec(f'i["id"] += {lastImgID}') for i in imgInfo]       # adjust the ID's
         [exec(f'i["image_id"] += {lastImgID}') for i in annosInfo] 
         [exec(f'i["id"] += {lastObjID}') for i in annosInfo] 
         [exec(f'i["bbox"] = [int(float(ib)) for ib in i["bbox"].split(",")]') for i in annosInfo] 
-        
+
         if segData:
             try:
-                # if there are segmentations
-                [exec(f'i["segmentation"] = [[float(ib) for ib in i["segmentation"].split(",")]]') for i in annosInfo if type(i)==list] 
+                # if there are segmentations in a format which require string processing
+                # (ie they aren't from a native coco format but have been made from masks)
+                [exec(f'i["segmentation"] = [[float(ib) for ib in i["segmentation"].split(",")]]') for i in annosInfo if type(i["segmentation"])==str and len(i["segmentation"]) > 0] 
             except:
                 # if there are no segmentations
                 [exec(f'i["segmentation"] = []') for i in annosInfo] 
@@ -115,6 +156,8 @@ def createCocoData(src, segData = False):
     json.dump(cocoInfo, open(src + "cocoAll.json", "w"), indent=4)
 
     print("     Finished createCocoData")
+
+    return(src + "cocoAll.json")
 
 def getDataSplit(src, split = [0.8, 0.1, 0.1]):
 
@@ -179,6 +222,8 @@ if __name__ == "__main__":
     src = "/media/boxfish/USB/data/CocoData/"
 
     # categoryInfo = getCategoriesInfo(src)
-    createCocoData(src, True)
+    cocosrc = createCocoData(src, True, None)
 
-    getDataSplit(src)
+    # getDataSplit(src)
+
+    annotateCocoSegments(cocosrc, "", False)
