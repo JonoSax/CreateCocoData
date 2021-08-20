@@ -9,12 +9,18 @@ area
 segmentation
 iscrowd
 
+NOTE the segmentation and bbox data has to be stored as strings because json
+can't save it: 
+
+    Object of type 'int64' is not JSON serializable
+
 '''
 
 import numpy as np
 from glob import glob
 import cv2
 from numpy.core.fromnumeric import repeat
+from numpy.core.numeric import outer
 if __name__ == "__main__":
     from utilities import *
 else:
@@ -46,7 +52,8 @@ def getAnnotations(img):
     '''
 
     dims = getDims(img)
-    pixels, segment = getSegmentation(img)
+    pixels, border = getSegmentation(img)
+    segment = str(list(np.hstack(border)))  # formatted for processCoco
     bbox = getBoundingBox(pixels)
     area = getArea(pixels)
     segment = processCoco(segment)
@@ -64,6 +71,44 @@ def getDims(img):
 
     return(x, y)
 
+def getSimple(mask, dsmp):
+
+    '''
+    Turn an outline of an image into a clockwise ordered set of co-ordinates
+    of only dsmp points
+    '''
+
+    edges = cv2.Canny(mask, 100, 200)
+    outline = np.c_[np.nonzero(edges)]
+
+    x, y = mask.shape
+
+    r = x/y
+
+    anchors = []
+    nx = int((dsmp/4)/r)
+    ny = int((dsmp/4)*r)
+    anchors += list(np.c_[np.linspace(0, x, nx, False), [0]*nx])
+    anchors += list(np.c_[[x]*ny, np.linspace(0, y, ny, False)])
+    anchors += list(np.c_[np.linspace(x, 0, nx, False), [y]*nx])
+    anchors += list(np.c_[[0]*ny, np.linspace(y, 0, ny, False)])
+
+    for a in anchors:
+        maskC = mask.copy()
+        cv2.rectangle(maskC, (int(a[1]), int(a[0])), (int(a[1]+50), int(a[0]+50)), 255, 4)
+        err = np.sum((outline-a)**2, axis = 1)
+        errSort = np.argsort(err)
+        err = (err-np.min(err))/(np.max(err) - np.min(err))
+        cv2.rectangle
+        for e in errSort:
+            p = outline[e]
+            cv2.circle(maskC, (p[1], p[0]), 3, (1-err[e])*255)
+
+        cv2.imshow("mask", maskC); cv2.waitKey(0)
+
+    return
+
+
 def getSegmentation(img, dsmp = 40):
 
     '''
@@ -74,7 +119,10 @@ def getSegmentation(img, dsmp = 40):
     '''
 
     # count all the non-zero pixel positions as the mask
-    imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    if len(img.shape) == 3:
+        imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    else:
+        imgGray = img
 
     # raw position info
     pixels = np.where(imgGray != 0)
@@ -82,34 +130,34 @@ def getSegmentation(img, dsmp = 40):
     # get the top of the image (left to right)
     x0 = []
     y0 = []
-    for i in range(imgGray.shape[0]):
-        pos = np.where((imgGray[i, :])==255)[0]
+    for i in range(imgGray.shape[1]):
+        pos = np.where((imgGray[:, i])==255)[0]
         if len(pos) > 0:
-            y0.append(max(pos))
-            x0.append(i)
+            x0.append(max(pos))
+            y0.append(i)
 
 
     # get the bottom of the image (right to left)
     x1 = []
     y1 = []
-    for i in range(imgGray.shape[0]-1, -1, -1):
-        pos = np.where((imgGray[i, :])==255)[0]
+    for i in range(imgGray.shape[1]-1, -1, -1):
+        pos = np.where((imgGray[:, i])==255)[0]
         if len(pos) > 0:
-            y1.append(min(pos))
-            x1.append(i)
-    
-    import matplotlib.pyplot as plt
+            x1.append(min(pos))
+            y1.append(i)
+
+    # border = getSimple(imgGray, dsmp)
+
     if len(x0) + len(x1) > dsmp:
         x0 = np.interp(np.linspace(0, len(x0), int(dsmp/2)), np.arange(len(x0)), np.array(x0))
         y0 = np.interp(np.linspace(0, len(y0), int(dsmp/2)), np.arange(len(y0)), np.array(y0))    
         x1 = np.interp(np.linspace(0, len(x1), int(dsmp/2)), np.arange(len(x1)), np.array(x1))
         y1 = np.interp(np.linspace(0, len(y1), int(dsmp/2)), np.arange(len(y1)), np.array(y1))    
 
-    border = list(np.hstack(np.c_[list(y0) + list(y1), list(x0) + list(x1)]))
+    border = np.c_[list(y0) + list(y1), list(x0) + list(x1)]
     # formatted for the segment info
-    segment = str([border])
 
-    return(pixels, segment)
+    return(pixels, border)
 
 def getBoundingBox(pixel):
 
@@ -186,11 +234,11 @@ def getMaskInfo(src, classDict, detailSegData = False, segData = True, cpuNo = 1
 
     annotationInfo = []
 
-    masks = sorted(glob(src + "masks/**/*"))
+    masks = sorted(glob(src + "masks/**/*"))[:100]
 
     idDict = json.load(open(src + "imgDict.json"))
-
-    if cpuNo:
+    cpuNo = 1
+    if cpuNo > 1:
         with Pool(cpuNo) as p:
             annotationInfo = p.starmap(maskInfo, zip(masks, repeat(classDict), repeat(detailSegData), repeat(segData), repeat(idDict),))
 
@@ -539,10 +587,10 @@ if __name__ == "__main__":
     src = "/Volumes/WorkStorage/BoxFish/dataStore/Aruco+Net/net_day_shade_pool/"
     src = "/Volumes/WorkStorage/BoxFish/dataStore/netData/foregrounds/mod/"
     src = "/Volumes/USB/data/YOLO_data/YOLO_data/Ulucan/"
-    src = "/media/boxfish/USB/data/CocoData/Ulucan/"
     src = '/Volumes/USB/data/CocoData/BrackishWaterImages/'
-    src = '/media/boxfish/USB/data/CocoData/BrackishWaterImages/'
     src = '/media/boxfish/USB/data/CocoData/NorFisk_v1.0/'
     src = '/media/boxfish/USB/data/CocoData/BigGloryBay/'
+    src = '/media/boxfish/USB/data/CocoData/BrackishWaterImages/'
+    src = "/media/boxfish/USB/data/CocoData/Ulucan/"
 
     getAnnotationInfo(src)  
