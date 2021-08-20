@@ -16,7 +16,6 @@ else:
     from cocoDataStructure.utilities import *
 import multiprocessing
 from multiprocessing import Pool
-from spare.createSyntheticData import imgMaskList
 import numpy as np
 from glob import glob
 import cv2
@@ -74,7 +73,5 @@ def getImageInfo(src, relative_path=False, cpuNo = 4):
 if __name__ == "__main__":
 
     src = "/Volumes/WorkStorage/BoxFish/dataStore/fishData/YOLO_data/Fish4Knowledge/"
-
-    getImageInfo(src, True)
-
-    pass
+    src = "/media/boxfish/USB/data/CocoData/Ulucan/"
+    getImageInfo(src)
