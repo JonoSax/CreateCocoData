@@ -1,4 +1,4 @@
-These scripts automate formation of the coco data sets necessary to train (many) object detection algorithms (such as YOLOv5). To run:
+These scripts automate formation of the coco data sets necessary to train (many) object detection algorithms (such as yolact, YOLOv5 etc.). To run:
 
 1 - pip install -r requirements
 Would recommend a virtual environment
