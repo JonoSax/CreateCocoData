@@ -67,7 +67,6 @@ def annotateCocoSegments(src, imgsrc = "", random = True):
 
     keys = list(imgDict.keys())[-10:]
     [imgDict[k] for k in keys]
-    randomCount = 0
 
     for n, a in enumerate(images):
         
@@ -123,11 +122,10 @@ def annotateCocoSegments(src, imgsrc = "", random = True):
         imgC = np.hstack([img, imgm])
         xc, yc, _ = imgC.shape
         if xc*yc > 3e6:
-            r = 5e6/(xc*yc)
+            r = 3e6/(xc*yc)
             imgC = cv2.resize(imgC, (int(imgC.shape[1]*r), int(imgC.shape[0]*r)))
 
         cv2.imshow("img", imgC); cv2.waitKey(0)
-        randomCount += 1
 
         # y0, x0, y1, x1 = np.array(bbox.replace("[", "").replace("]", "").replace(" ", "").split(",")).astype(int)
         # cv2.rectangle(imgm, [x0, y0], [x0+x1, y0+y1], [0, 0, 255], 2)
@@ -190,8 +188,8 @@ def annotateYoloSegments(src, random = True):
             
         imgC = np.hstack([img, imgm])
         xc, yc, _ = imgC.shape
-        if xc*yc > 5e6:
-            r = 5e6/(xc*yc)
+        if xc*yc > 3e6:
+            r = 3e6/(xc*yc)
             imgC = cv2.resize(imgC, (int(imgC.shape[1]*r), int(imgC.shape[0]*r)))
 
         cv2.imshow("img", imgC); cv2.waitKey(0)
@@ -216,9 +214,9 @@ if __name__ == "__main__":
     cocosrc = "/media/boxfish/USB/data/CocoData/cocoAll.json"
     imgsrc = ""
 
-    # annotateCocoSegments(cocosrc, imgsrc)
+    annotateCocoSegments(cocosrc, imgsrc, False)
 
 
     yolosrc = "/Volumes/USB/data/coco128/"
     yolosrc = "/media/boxfish/USB/data/YoloDataGloryBay/"
-    annotateYoloSegments(yolosrc, False)
+    annotateYoloSegments(yolosrc, random = False)
