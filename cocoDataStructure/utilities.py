@@ -172,7 +172,7 @@ def getAllImages(src):
     imgFormats = ["jpg", "jpeg", "png", "tif"]
     imgs = []
     for i in imgFormats:
-        imgs += sorted(glob(f'{src}/**/*.{i}', recursive=True))
+        imgs += sorted(glob(f'{src}/images/**/*.{i}', recursive=True))
 
     return(imgs)
 
