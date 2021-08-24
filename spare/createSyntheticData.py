@@ -15,7 +15,7 @@ This is creating synthetic data based on foreground and background images.
 Both can be independently modified (randomally) and combined (randomally)
 and the corresponding masks and coco data sets are automatically generated. 
 
-NOTE currently this only works for a single class. 
+NOTE currently this only works for a single class with masks. 
 
 FUTURE WORK is to make this flexible for multiple classes
     I think a simple way to do this would be to call createSyntheticMedia 
@@ -319,6 +319,7 @@ class augmentImageTF():
             imgs["img"] *= ((imgs["mask"] > 127)*1).astype(np.uint8)
 
         return(imgs)
+
 class augmentImageAL(Dataset):
 
     def __init__(self, images_filepaths, max_size, min_size, mask_filespaths = None, transform = None,):
@@ -368,6 +369,7 @@ class augmentImageAL(Dataset):
             image = tranformResult["image"]
 
         return {"images": image, "masks": mask, "name": name}
+
 class createSyntheticImages():
 
     '''
