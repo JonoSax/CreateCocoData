@@ -6,7 +6,7 @@ do not already exist
 import numpy as np
 import cv2
 from glob import glob
-from cocoDataStructure.utilities import getAllImages, createIDDict
+from cocoDataStructure.utilities import createIDDict, PolyArea
 import json
 from cocoDataStructure.annotations import getSegmentation, processCoco
 from multiprocessing.pool import Pool
@@ -43,31 +43,39 @@ def segmentImg(i, annoInfo, iter = 10):
     fgModel = np.zeros((1, 65), dtype="float")
     bgModel = np.zeros((1, 65), dtype="float")
 
-
+    segment = []
+    area = []
+    annoIds = []
+    info = []
     for a in imgAnno:
-        annoId = a["id"]
+        if a["iscrowd"] == 1:
+            continue
+        annoIds = a["id"]
         rect = getbbox(a['bbox'])
 
         (mask, bgModel, fgModel) = cv2.grabCut(img, mask, rect, bgModel,
         fgModel, iterCount=iter, mode=cv2.GC_INIT_WITH_RECT)
 
-        '''
-        # loop over the possible GrabCut mask values
-        for (name, value) in values:
-            # construct a mask that for the current value
-            print("[INFO] showing mask for '{}'".format(name))
-            valueMask = (mask == value).astype("uint8") * 255
-            # display the mask so we can visualize it
-            cv2.imshow(name, valueMask)
-            cv2.waitKey(0)
-        '''
+        
+        try:
+            outputMask = np.where((mask == cv2.GC_BGD) | (mask == cv2.GC_PR_BGD), 0, 1)
+            outputMask = (outputMask * 255).astype("uint8")
+            _, border = getSegmentation(outputMask, 40)
 
-        outputMask = np.where((mask == cv2.GC_BGD) | (mask == cv2.GC_PR_BGD), 0, 1)
-        outputMask = (outputMask * 255).astype("uint8")
-        _, border = getSegmentation(outputMask, 40)
-        segment = str(list(np.hstack(border)))
-        segment = processCoco(segment)
-        return(annoId, segment)
+            for b in border:
+                cv2.circle(img, (int(b[0]), int(b[1])), 4, [255, 0, 0], 4)
+            cv2.rectangle(img, (rect[0], rect[1]), (rect[2]+rect[0], rect[3]+rect[1]), [0, 0, 255], 4)
+            cv2.imshow("img", img); cv2.waitKey(0)
+
+            segmentRaw = str(list(np.hstack(border)))
+            segment = processCoco(segmentRaw)
+            area = PolyArea(border[:, 0], border[:, 1])
+            info.append([annoIds, segment, area])
+        except:
+            pass
+
+    return(info)
+
 
 
 if __name__ == "__main__":
@@ -75,6 +83,7 @@ if __name__ == "__main__":
     cpuNo = 1
 
     src = "/media/boxfish/USB/data/CocoData/NorFisk_v1.0/"
+    src = "/media/boxfish/USB/data/CocoData/openimages/"
 
     annoInfo = json.load(open(src + "annotations.json"))
     imgInfo = json.load(open(src + "images.json"))
@@ -89,18 +98,24 @@ if __name__ == "__main__":
 
     if cpuNo > 1:
         with Pool(14) as p:
-            segmentation = p.starmap(segmentImg, zip(imgInfo, repeat(annoInfoId)))
+            segmentation = p.starmap(segmentImg, zip(imgInfo[2:1000], repeat(annoInfoId)))
     else:
         segmentation = []
-        for i in imgInfo[:10]:
+        for i in imgInfo[10:]:
             segmentation.append(segmentImg(i, annoInfoId))
 
     segDict = {}
-    for id, seg in segmentation:
-        segDict[id] = seg
+    for info in segmentation:
+        for i in info:
+            if i is not None: 
+                annoid, seg, area = i
+                segDict[annoid] = [seg, area]
 
     for a in annoInfo:
-        a["segmentation"] = segDict.get(a["id"], "")
+        # add the segmentation annotations and update the area
+        info = segDict.get(a["id"])
+        if info is not None:
+            a["segmentation"], a["area"] = info
 
     json.dump(annoInfo, open(src + "annotationsSegment.json", 'w'))
     print("done")
